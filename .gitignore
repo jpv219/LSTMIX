@@ -5,3 +5,4 @@ RawData/
 __pycache__/
 .DS_Store
 *.txt
+*.png
