@@ -21,11 +21,13 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 ## Env. variables ##
 
-#fig_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/figs/'
-#input_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/input_data/'
+fig_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/figs/'
+input_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/input_data/'
+trainedmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/trained_models/'
 
-fig_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/figs/'
-input_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX//LSTM_MTM/input_data/'
+#fig_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/figs/'
+#input_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX//LSTM_MTM/input_data/'
+#trainedmod_savepath = ''
 
 ##################################### CLASSES #################################################
 
@@ -259,7 +261,7 @@ class EarlyStopping:
         """
         if self.verbose:
             print(f'Validation loss decreased ({self.best_score:.6f} --> {val_loss:.6f}). Saving model...')
-        torch.save(model.state_dict(), f'{self.name}_trained_model.pt')  # Save the model's state_dict.
+        torch.save(model.state_dict(), os.path.join(trainedmod_savepath,f'{self.name}_trained_model.pt'))  # Save the model's state_dict.
 
 ####################################### TRAINING FUN. #####################################
 
@@ -332,56 +334,6 @@ def train_DMS(model, optimizer, loss_fn, loader, scheduler,
                 print('Early stopping')
                 break
 
-    ## Load the last best model before training degrades         
-    model.load_state_dict(torch.load('DMS_trained_model.pt'))
-
-####################################### PLOTTING FUN. #####################################
-
-def plot_model_pred(model,model_name,features,set_labels,set,
-                    X_data,true_data,wind_size,casebatch_len):
-
-    model.load_state_dict(torch.load(f'{model_name}_trained_model.pt'))
-    model.eval()
-    with torch.no_grad():
-
-        y_pred_data = model(X_data)
-            
-        print(y_pred_data.shape)
-
-    num_features = len(features) #Nd and IA
-    num_cases = len(set_labels)
-    colors = sns.color_palette("coolwarm", num_cases)
-
-    # Loop over features
-    for f_idx in range(num_features):
-        plt.figure(figsize=(12,6))
-        s_idx = -1
-        
-        for seq, case in zip(range(num_cases), set_labels):
-            # Target plots, true data from CFD
-            p = plt.plot(true_data[:, seq, f_idx], label=f'Target {str(case)}', color=colors[seq % len(colors)], linewidth = 2) # true_data has shape [times,cases,features]
-            
-            # Train predicted values
-            if seq == 0:
-                plt.plot(range(wind_size-1,len(true_data)),
-                        y_pred_data[:casebatch_len[seq],s_idx,f_idx], 
-                        c=p[0].get_color(),linestyle=':', label=f'{set} predicted {str(case)}',linewidth = 4)
-            else:
-                plt.plot(range(wind_size-1,len(true_data)),
-                        y_pred_data[casebatch_len[seq-1]:casebatch_len[seq],s_idx,f_idx], 
-                        c=p[0].get_color(),linestyle=':', label=f'{set} predicted {str(case)}', linewidth = 4)
-                
-        if f_idx == 1:
-            plt.ylim(0.6, 1.1)
-
-
-        plt.legend()
-        plt.xlim(40, 105)
-        plt.title(f'{set} prediction for {features[f_idx]}')
-        plt.xlabel('Time steps')
-        plt.ylabel(f'Scaled {features[f_idx]}')
-        plt.show
-
 ########################################### MAIN ###########################################
 
 def main():
@@ -405,29 +357,30 @@ def main():
     train_frac = 0.5625
     test_frac = 0.25
 
-    train_df, val_df, test_df, splitset_labels = windowing.split_cases(
+    train_arr, val_arr, test_arr, splitset_labels = windowing.split_cases(
         input_df, train_frac, test_frac, Allcases)
     
     ## plotting split data
     plot_choice = input('plot split data sets? (y/n) :')
     if plot_choice.lower() == 'y' or plot_choice.lower() == 'yes':
-        windowing.plot_split_cases(input_df, splitset_labels, train_df, val_df, test_df, 
+        windowing.plot_split_cases(input_df, splitset_labels, train_arr, val_arr, test_arr, 
                             features,Allcases)
     else:
         pass
     
     ## Windowing hyperparameters
     steps_in, steps_out = 36, 20
-    wind_size = steps_in + steps_out
     stride = 1
     
     #Windowed training data
-    X_train, y_train, train_casebatch = windowing.window_data(train_df, steps_in, stride, steps_out)
+    X_train, y_train, train_casebatch = windowing.window_data(train_arr, steps_in, stride, steps_out)
     #Windowed validation data
-    X_val, y_val, val_casebatch = windowing.window_data(val_df, steps_in, stride, steps_out)
+    X_val, y_val, val_casebatch = windowing.window_data(val_arr, steps_in, stride, steps_out)
 
-    print(X_train.shape, y_train.shape)
-    print(X_val.shape, y_val.shape)
+    print(f"Windowed input training data shape: {X_train.shape}")
+    print(f"Training windowed output shape: {y_train.shape}")
+    print(f"Windowed input validation data shape: {X_val.shape}")
+    print(f"Validation windowed output shape: {y_val.shape}")
 
     ### LSTM MODEL TRAINING ###
 
@@ -441,6 +394,10 @@ def main():
     learning_rate = 0.01
     num_epochs = 3000
     check_epochs = 100
+
+    # customize loss function 
+    penalty_weight = 10
+    loss_fn = custom_loss(penalty_weight)
         
     ## Calling model class instance and training function
     model_choice = input('Select a LSTM model to train (DMS, S2S): ')
@@ -453,11 +410,6 @@ def main():
         loader = data.DataLoader(data.TensorDataset(X_train, y_train), shuffle=True, batch_size=batch_size)
         optimizer = optim.Adam(model.parameters(), lr = learning_rate) # optimizer to estimate weights and biases (backpropagation)
             
-        # customize loss function 
-        penalty_weight = 10
-        loss_fn = custom_loss(penalty_weight)
-
-
         # Learning rate scheduler, set on min mode to decrease by factor when validation loss stops decreasing                                       
         scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=True)
         
@@ -465,25 +417,65 @@ def main():
             num_epochs=num_epochs, check_epochs=check_epochs,
             X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val,
             saveas='DMS_out')
-    else:
+        
+    elif model_choice == 'S2S':
         # LSTM model instance
         model = LSTM_DMS(input_size, hidden_size, output_size, pred_steps,
                         l1_lambda=0.00, l2_lambda=0.00)
         
-    ## plot final predictions from train and validation data
-
-
-        ## plotting train and val predicted data
-    pred_choice = input('plot predicted training and val data? (y/n) :')
-
-    if pred_choice.lower() == 'y' or pred_choice.lower() == 'yes':
-        plot_model_pred(model, model_choice, features, splitset_labels[0],
-                        'Train',X_train, train_df, wind_size, train_casebatch)
     else:
-        pass
+        raise ValueError('Model selected is not configured/does not exist. Double check input.')
 
+    ### SAVING ALL RELEVANT DATA ###
 
+    set_labels = ["train", "val", "test"]
+    arrays = [train_arr, val_arr, test_arr]
+    windowed_tensors = [X_train, X_val]
+    casebatches = [train_casebatch,val_casebatch]
 
+    ## saving train, validation and test data sets previously split and used as input for windowing process, with corresponding labels
+    for setlbl, arr, caselbl_list in zip(set_labels, arrays, splitset_labels):
+
+        save_dict = {
+        f"{setlbl}_arr": arr,
+        "splitset_labels": caselbl_list
+    }
+        with open(os.path.join(trainedmod_savepath,f'data_sets_{model_choice}', f'{setlbl}_pkg.pkl'), 'wb') as file:
+            pickle.dump(save_dict, file)
+
+        print(f"Saved split set data and labels {setlbl}_pkg.pkl")
+
+    ## saving windowed train and validation datasets (pytorch tensors), with corresponding casebatch lengths  
+    for setlbl, tens, csbatch in zip(set_labels, windowed_tensors, casebatches):
+        
+        save_dict = {
+        "windowed_data": tens,
+        f"{setlbl}_casebatch": csbatch
+    }
+        file = os.path.join(trainedmod_savepath,f'data_sets_{model_choice}', f'X_{setlbl}.pt')
+
+        torch.save(save_dict, file)
+
+        print(f"Saved torch package X_{setlbl}.pt")
+    
+    ## save hyperparameters used for model trained for later plotting and rollout prediction
+    hyperparams = {
+        "input_size": input_size,
+        "hidden_size": hidden_size,
+        "output_size": output_size,
+        "pred_steps": pred_steps,
+        "batch_size": batch_size,
+        "learning_rate": learning_rate,
+        "num_epochs": num_epochs,
+        "steps_in": steps_in,
+        "steps_out": steps_out
+    }
+
+    with open(os.path.join(trainedmod_savepath,f'hyperparams_{model_choice}.txt'), "w") as file:
+
+        for key, value in hyperparams.items():
+            file.write(f"{key}: {value}\n")
+    
 
 
 if __name__ == "__main__":
