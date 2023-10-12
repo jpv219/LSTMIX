@@ -10,8 +10,11 @@ import os
 import pickle
 import torch
 import matplotlib.pyplot as plt
+from matplotlib import rc
 import seaborn as sns
-from train_LSTM import LSTM_DMS
+from modeltrain_LSTM import LSTM_DMS
+import numpy as np
+from sklearn.metrics import r2_score
 
 ## Env. variables ##
 
@@ -20,6 +23,34 @@ trainedmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/
 
 ####################################### ROLLOUT PREDICTION #####################################
 
+# Function to predict future values using rollout with the LSTM model
+def rollout(model, input_seq, steps_out,total_steps):
+    
+    ## setting to eval mode and dropping gradient calculation for prediction
+    model.eval()
+    with torch.no_grad():
+        
+        reshaped_input = np.transpose(input_seq, (1,0,2)) #reshaping to case,inputdata,features
+        
+        tensor_input = torch.Tensor(reshaped_input)
+
+        rolled_predictions = [tensor_input.detach().clone()]
+
+        ### how many predicted windows will be calculated based on the input_steps
+        num_forwards = int(total_steps / steps_out) + 1
+        print(f'prediction iterates for {num_forwards} times.')
+
+        ## window predicton
+        for _ in range(num_forwards):
+
+            output = model(rolled_predictions[-1]) #LSTM pass with latest prediction window as input
+
+            rolled_predictions.append(output.detach().clone())
+
+        # Concatenate all predictions into a single tensor
+        rolled_predictions = torch.cat(rolled_predictions, dim=1)               
+
+    return rolled_predictions
 
 ####################################### PLOTTING FUN. #####################################
 
@@ -35,6 +66,10 @@ def plot_model_pred(model,features,set_labels,set,
     num_cases = len(set_labels)
     colors = sns.color_palette("coolwarm", num_cases)
 
+    rc('text', usetex=True)
+    custom_font = {'family': 'serif', 'serif': ['Computer Modern Roman']}
+    rc('font', **custom_font)
+
     # Loop over features
     for f_idx in range(num_features):
         fig = plt.figure(figsize=(12,6))
@@ -48,11 +83,11 @@ def plot_model_pred(model,features,set_labels,set,
             if seq == 0:
                 plt.plot(range(wind_size-1,len(true_data)),
                         y_pred_data[:casebatch_len[seq],s_idx,f_idx], 
-                        c=p[0].get_color(),linestyle=':', label=f'{set} predicted {str(case)}',linewidth = 4)
+                        c=p[0].get_color(),linestyle=':', label=f'Pred. {str(case)}',linewidth = 4)
             else:
                 plt.plot(range(wind_size-1,len(true_data)),
                         y_pred_data[casebatch_len[seq-1]:casebatch_len[seq],s_idx,f_idx], 
-                        c=p[0].get_color(),linestyle=':', label=f'{set} predicted {str(case)}', linewidth = 4)
+                        c=p[0].get_color(),linestyle=':', label=f'Pred. {str(case)}', linewidth = 4)
                 
         if f_idx == 1:
             plt.ylim(0.6, 1.1)
@@ -60,13 +95,38 @@ def plot_model_pred(model,features,set_labels,set,
 
         plt.legend()
         plt.xlim(40, 105)
-        plt.title(f'{set} prediction for {features[f_idx]}')
+        plt.title(f'Prediction for {features[f_idx]} in {set} set')
         plt.xlabel('Time steps')
         plt.ylabel(f'Scaled {features[f_idx]}')
 
-        fig.savefig(os.path.join(fig_savepath, f'{set}_{features[f_idx]}.png'), dpi=150)
-        plt.show
+        fig.savefig(os.path.join(fig_savepath, f'Prediction_{features[f_idx]}_{set}_set.png'), dpi=150)
+        plt.show()
 
+def plot_rollout_pred(rollout_seq, true_data, features,set_labels):
+
+    colors = sns.color_palette("cubehelix", len(set_labels))
+    rc('text', usetex=True)
+    custom_font = {'family': 'serif', 'serif': ['Computer Modern Roman']}
+    rc('font', **custom_font)
+
+    num_features = len(features)
+
+    for f_idx in range(num_features):
+        fig = plt.figure()
+        for i, case in enumerate(set_labels):
+            ## truedata shaped as (timesteps, cases, features) and rollout as (case,timestep,features)
+            r2 = r2_score(true_data[:,i,f_idx],rollout_seq[i,:,f_idx][:true_data.shape[0]])
+
+            p = plt.plot(true_data[:,i,f_idx], label=f'Target {case}, r2:{r2:.4f}',color = colors[i % len(colors)],linewidth = 2)
+            plt.plot(rollout_seq[i,:,f_idx],c=p[0].get_color(), linestyle=':',label=r'Prediction',linewidth = 4)
+        
+        plt.legend()
+        plt.title(f'Rollout prediction for: {features[f_idx]}')
+        plt.xlim(35, 105)
+        plt.xlabel('Time steps')
+        plt.ylabel(f'Scaled {features[f_idx]}')
+        fig.savefig(os.path.join(fig_savepath, f'Rollout_pred_{features[f_idx]}.png'), dpi=150)
+        plt.show()
 
 def main():
     
@@ -75,7 +135,7 @@ def main():
     ## Select LSTM model trained to use for predictions and plots
     model_choice = input('Select a LSTM model to use for predictions (DMS, S2S): ')
 
-    # Loading containers
+    # Initializing loading containers
     set_labels = ["train", "val", "test"]
     hyperparams = {}
     arrays = []
@@ -96,7 +156,7 @@ def main():
         npfile = os.path.join(trainedmod_savepath,f'data_sets_{model_choice}', f'{setlbl}_pkg.pkl')
         ptfile = os.path.join(trainedmod_savepath,f'data_sets_{model_choice}', f'X_{setlbl}.pt')
 
-        ## Loading pkg with numpyarrays with input data before windowing
+        ## Loading pkg with input data as numpyarrays before windowing
         with open(npfile, 'rb') as file:
             save_pkg = pickle.load(file)
 
@@ -108,6 +168,8 @@ def main():
             save_tens = torch.load(ptfile)
             windowed_tensors.append(save_tens["windowed_data"])
             casebatches.append(save_tens[f"{setlbl}_casebatch"])
+    
+    ## PREDICTIONS ##
     
     wind_size = hyperparams["steps_in"] + hyperparams["steps_out"]
 
@@ -128,13 +190,33 @@ def main():
     if pred_choice.lower() == 'y' or pred_choice.lower() == 'yes':
 
         X_train = windowed_tensors[0]
+        X_val = windowed_tensors[1]
         train_arr = arrays[0]
+        val_arr = arrays[1]
         train_casebatch = casebatches[0]
+        val_casebatch = casebatches[1]
 
         plot_model_pred(model, features, splitset_labels[0],
                         'Train',X_train, train_arr, wind_size, train_casebatch)
+        
+        plot_model_pred(model, features, splitset_labels[1],
+                'Validation',X_val, val_arr, wind_size, val_casebatch)
     else:
         pass
+
+    ## carry out rollout predictions on testing data sets
+    test_arr = arrays[2]
+
+    ## Extracting input steps from test data, keeping all cases and features in shape (in_steps,cases,features)
+    input_seq = test_arr[:hyperparams["steps_in"],:,:]
+
+    # Total steps to predict
+    total_steps = test_arr.shape[0] - hyperparams["steps_in"]
+
+    ## Calling rollout prediction for test data
+    rollout_seq = rollout(model,input_seq,hyperparams["steps_out"],total_steps)
+
+    plot_rollout_pred(rollout_seq,test_arr, features,splitset_labels[2])
 
 if __name__ == "__main__":
     main()

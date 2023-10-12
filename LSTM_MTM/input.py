@@ -19,13 +19,13 @@ import pickle
 
 ## Env. variables ##
 
-#fig_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/figs/'
-#input_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/input_data/'
+fig_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/figs/'
+input_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/input_data/'
 
-fig_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/figs/'
-input_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX//LSTM_MTM/input_data/'
+#fig_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/figs/'
+#input_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX//LSTM_MTM/input_data/'
 
-### Methods ###
+##### METHODS #####
 
 def import_rawdata(case):
     if case == '3drop' or case == 'coarsepm':
@@ -163,7 +163,7 @@ def smoothing(data, method, window_size=None, poly_order=None, lowess_frac = Non
     
     return smoothed_data
 
-## plots ##
+#### PLOTS ####
 
 def plot_inputdata(cases,data,dpi=150):
     ### looping over the number of features (Nd and IA)
@@ -198,7 +198,7 @@ def plot_inputdata(cases,data,dpi=150):
 
 def plot_smoothdata(data, smoothed_data, method, cases,dpi=150):
     
-    fig, ax = plt.subplots(1,2, figsize=(10,6), dpi=dpi, num=2)
+    fig, ax = plt.subplots(1,2, figsize=(12,8), dpi=dpi, num=2)
     colors = sns.color_palette("husl", len(cases))
 
     for case, idx in zip(cases, range(len(cases))):
@@ -215,7 +215,6 @@ def plot_smoothdata(data, smoothed_data, method, cases,dpi=150):
     fig.suptitle(f'Smoothing method: {method}', fontsize=18)
 
     ax[0].legend()
-    ax[1].legend()
     plt.savefig(os.path.join(fig_savepath,'smoothed_data'),dpi=dpi)
     plt.tight_layout()
     plt.show()

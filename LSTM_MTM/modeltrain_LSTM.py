@@ -17,6 +17,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.utils.data as data
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+from tools_modeltraining import custom_loss, EarlyStopping
 
 
 ## Env. variables ##
@@ -33,7 +34,7 @@ trainedmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/
 
 class Window_data():
 
-## split cases intro train, test and val data sets
+    ## split cases intro train, test and val data sets
     def split_cases(self, df, train_frac, test_frac, cases):
         '''
         input shape: (times, cases, features)
@@ -54,7 +55,7 @@ class Window_data():
             
         return train, val, test, (train_cases, val_cases, test_cases)
 
-## plot split data sets   
+    ## plot split data sets   
     def plot_split_cases(self, data, splitset_labels, train, val, test, 
                         features, case_labels, dpi=150):
 
@@ -93,7 +94,7 @@ class Window_data():
                     ax[i].legend()
 
             ## saving figures
-            fig.savefig(os.path.join(fig_savepath, f'{label}_{features[i]}.png'), dpi=dpi)
+            fig.savefig(os.path.join(fig_savepath, f'{label}_data_{features[i]}.png'), dpi=dpi)
 
             plt.show()
 
@@ -190,78 +191,6 @@ class LSTM_DMS(nn.Module):
             return 0.5 * self.l2_lambda * l2_loss
         else:
             return 0
-
-class custom_loss(nn.Module):
-
-    # constructor and super from the parent nn.Module class
-    def __init__(self, penalty_weight):
-        super().__init__()
-        self.penalty_weight = penalty_weight
-        
-    def forward(self, prediction, target):
-        # mse as base loss function
-        mse_loss = nn.MSELoss()(prediction, target)
-        
-        # penalise negative prediction
-        '''
-        -prediction: negates all the values in prediction tensor
-        torch.relu: set all the now negative values (i.e., initially positive) as zero and postive (previously negative) values unchanged
-        torch.mean: average the penalty for all the previously negative predictions
-        '''
-        penalty = torch.mean(torch.relu(-prediction))
-        
-        custom_loss = mse_loss + self.penalty_weight * penalty
-        
-        return custom_loss 
-
-class EarlyStopping:
-    def __init__(self, model_name, patience=5, verbose=False, delta=0.0001):
-        """
-        Args:
-            patience (int): How long to wait after last improvement in the monitored metric.
-                            Default: 5
-            verbose (bool): If True, print a message for each validation loss improvement.
-                            Default: False
-            delta (float): Minimum change in the monitored metric to be considered an improvement.
-                            Default: 0.0001
-        """
-        self.patience = patience
-        self.verbose = verbose
-        self.delta = delta
-        self.counter = 0
-        self.best_score = None
-        self.early_stop = False
-        self.name = model_name
-
-    def __call__(self, val_loss, model):
-        """
-        Args:
-            val_loss (float): Validation loss to be monitored for improvement.
-            model (nn.Module): Model to be saved if the monitored metric improves.
-        """
-        score = -val_loss  # Assuming lower validation loss is better.
-
-        if self.best_score is None:
-            self.best_score = score
-            self.save_checkpoint(val_loss, model)
-        elif score < self.best_score + self.delta:
-            self.counter += 1
-            if self.verbose:
-                print(f'EarlyStopping counter: {self.counter} out of {self.patience}')
-            if self.counter >= self.patience:
-                self.early_stop = True
-        else:
-            self.best_score = score
-            self.save_checkpoint(val_loss, model)
-            self.counter = 0
-
-    def save_checkpoint(self, val_loss, model):
-        """
-        Saves model when validation loss decreases.
-        """
-        if self.verbose:
-            print(f'Validation loss decreased ({self.best_score:.6f} --> {val_loss:.6f}). Saving model...')
-        torch.save(model.state_dict(), os.path.join(trainedmod_savepath,f'{self.name}_trained_model.pt'))  # Save the model's state_dict.
 
 ####################################### TRAINING FUN. #####################################
 
