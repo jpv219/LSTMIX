@@ -15,11 +15,12 @@ from scipy.signal import savgol_filter
 from statsmodels.nonparametric.smoothers_lowess import lowess
 import os
 import pickle
+import ast
 
 ## Env. variables ##
 
-fig_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/figs/'
-input_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/input_data/'
+fig_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/figs/'
+input_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/input_data/'
 
 #fig_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/figs/'
 #input_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX//LSTM_MTM/input_data/'
@@ -58,6 +59,35 @@ def import_rawdata(case):
 
     return df_Vol, Nd, IntA
 
+def import_svrawdata(case, initial=320, stop=704, opt=0.00625):
+    '''
+    return a dataframe with columns ['Time', 'DropVolume', 'Gammatilde', 'DropNum', 'IntArea']
+    '''
+    
+    data_dir = '/home/fl18/Desktop/automatework/RNN_auto/APSdata/'
+    df = pd.read_csv(str(data_dir)+str(case)+'.csv')
+    
+    # surfactant-laden cases to count the drop numbers from list drop volume
+    if not case == 'clean':
+        df['DropVolume'] = df['DropVolume'].str.replace(' ',', ')
+        df['Gammatilde'] = df['Gammatilde'].apply(lambda x: ', '.join(x.split())) # standardize the separator
+        df['DropVolume'] = df['DropVolume'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
+        df['Gammatilde'] = df['Gammatilde'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
+        df['DropNum'] = df['DropVolume'].apply(lambda x: len(x))
+    
+    else:
+        df['DropVolume'] = df['DropVolume'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
+        df['DropNum'] = df['DropVolume'].apply(lambda x: len(x))
+    
+    # Truncation of data
+    truned_df = df.loc[(df['Time']/opt >= initial) & (df['Time']/opt <= stop)]
+    
+    # merge the data of interfacial area
+    ints_df = pd.read_csv(str(data_dir)+'IntArea_'+str(case)+'.csv')
+    data = pd.merge(truned_df, ints_df, on='Time', how='left')
+    
+    return data
+
 ## group input data into case-wise dictionary
 
 def sort_inputdata(cases):
@@ -69,18 +99,24 @@ def sort_inputdata(cases):
     # Loop through all cases
     for case in cases:
         # Extract raw data
-        df_Vol, Nd, IntA = import_rawdata(case)
+        # df_Vol, Nd, IntA = import_rawdata(case)
         
-        time = Nd['Time']
-        n_drops = Nd['Ndrops']
-        IA = IntA['IA']
-        DSD = df_Vol['Volume']
+        # time = Nd['Time']
+        # n_drops = Nd['Ndrops']
+        # IA = IntA['IA']
+        # DSD = df_Vol['Volume']
+        data = import_svrawdata(case)
+        print(data.columns)
+        time = data['Time']
+        n_drops = data['DropNum']
+        IA = data['IntArea']
+        DSD = data['DropVolume']
         
         # Determine if case needs surf. conc. or clean
-        if case == '3drop' or case == 'coarsepm':
+        if case == '3drop' or case == 'coarsepm' or case == 'clean':
             G = []  # If true, set G as an empty list
         else:
-            G = df_Vol['Gammatilde']  # If false, extract G data
+            G = data['Gammatilde']  # If false, extract G data
         
         ## Dictionary holding a dictionary per case for all extracted data from paraview
         pre_dict[case] = {'Time': time, 'Nd': n_drops, 'IA': IA, 'Vol': DSD, 'G': G}
@@ -250,30 +286,32 @@ def plot_smoothdata(data, smoothed_data, method, cases,dpi=150):
 
 def main():
 
-    Allcases = ['b03','b06','bi001','bi01','da01','da1','b06pm','b09pm','bi001pm',
-    'bi1','bi01pm','3drop',
-    'b09','da01pm','da001', 'coarsepm']
+    # Allcases = ['b03','b06','bi001','bi01','da01','da1','b06pm','b09pm','bi001pm',
+    # 'bi1','bi01pm','3drop',
+    # 'b09','da01pm','da001', 'coarsepm']
+
+    svcases = ['Bi0001','Bi0002','Bi0004','Bi001','B07','clean','B09', 'B05', 'Bi1']
 
     # List of columns to be normalized
     norm_columns = ['Nd', 'IA']
 
     # scaled input data 
-    post_dict = scale_inputs(Allcases,norm_columns)
+    post_dict = scale_inputs(svcases,norm_columns)
 
     # re-shaped input data
     shaped_input = shape_inputdata(post_dict)
 
     #plotting
-    plot_inputdata(Allcases,shaped_input)
+    plot_inputdata(svcases,shaped_input)
 
     # smoothing data
     smoothed_data = smoothing(shaped_input,'savgol',window_size=5,poly_order=3)
 
-    plot_smoothdata(shaped_input, smoothed_data, 'savgol', Allcases)
+    plot_smoothdata(shaped_input, smoothed_data, 'savgol', svcases)
 
     ## saving input data 
 
-    with open(os.path.join(input_savepath,'inputdata.pkl'),'wb') as file:
+    with open(os.path.join(input_savepath,'svinputdata.pkl'),'wb') as file:
         pickle.dump(smoothed_data,file)
 
 if __name__ == "__main__":

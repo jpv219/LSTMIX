@@ -22,9 +22,9 @@ from tools_modeltraining import custom_loss, EarlyStopping
 
 ## Env. variables ##
 
-fig_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/figs/'
-input_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/input_data/'
-trainedmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/trained_models/'
+fig_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/figs/'
+input_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/input_data/'
+trainedmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/trained_models/'
 
 #fig_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/figs/'
 #input_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX//LSTM_MTM/input_data/'
@@ -521,33 +521,35 @@ def main():
     ## Class instance declarations:
     windowing = Window_data()
 
-    Allcases = ['b03','b06','bi001','bi01','da01','da1','b06pm','b09pm','bi001pm',
-    'bi1','bi01pm','3drop',
-    'b09','da01pm','da001', 'coarsepm']
+    # Allcases = ['b03','b06','bi001','bi01','da01','da1','b06pm','b09pm','bi001pm',
+    # 'bi1','bi01pm','3drop',
+    # 'b09','da01pm','da001', 'coarsepm']
+
+    svcases = ['Bi0001','Bi0002','Bi0004','Bi001','B07','clean','B09', 'B05', 'Bi1']
 
     features = ['Number of drops', 'Interfacial Area']
 
     # Reading saved re-shaped input data from file
-    with open(os.path.join(input_savepath,'inputdata.pkl'), 'rb') as file:
+    with open(os.path.join(input_savepath,'svinputdata.pkl'), 'rb') as file:
         input_df = pickle.load(file)
     
     ## data splitting for training, validating and testing
-    train_frac = 0.5625
-    test_frac = 0.25
+    train_frac = 0.7
+    test_frac = 0.15
 
     train_arr, val_arr, test_arr, splitset_labels = windowing.split_cases(
-        input_df, train_frac, test_frac, Allcases)
+        input_df, train_frac, test_frac, svcases)
     
     ## plotting split data
     plot_choice = input('plot split data sets? (y/n) :')
     if plot_choice.lower() == 'y' or plot_choice.lower() == 'yes':
         windowing.plot_split_cases(input_df, splitset_labels, train_arr, val_arr, test_arr, 
-                            features,Allcases)
+                            features,svcases)
     else:
         pass
     
     ## Windowing hyperparameters
-    steps_in, steps_out = 36, 20
+    steps_in, steps_out = 50, 50
     stride = 1
     
     #Windowed training data
@@ -568,7 +570,7 @@ def main():
     num_layers = 1 # Number of LSTM layers per unit
     output_size = y_train.shape[-1]  # Number of output features, same as input in this case
     pred_steps = steps_out # Number of future steps to predict
-    batch_size = 10 # How many windows are being processed per pass through the LSTM
+    batch_size = 30 # How many windows are being processed per pass through the LSTM
     learning_rate = 0.01
     num_epochs = 3000
     check_epochs = 100

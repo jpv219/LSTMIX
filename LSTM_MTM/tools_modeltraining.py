@@ -11,7 +11,7 @@ import torch
 import torch.nn as nn
 
 ## Env. variables ##
-trainedmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/trained_models/'
+trainedmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/trained_models/'
 
 ##################################### CLASSES #################################################
 
