@@ -10,7 +10,6 @@ import pandas as pd
 import Load_Clean_DF
 from sklearn.preprocessing import MinMaxScaler
 import matplotlib.pyplot as plt
-from matplotlib import rc
 import seaborn as sns
 from scipy.signal import savgol_filter
 from statsmodels.nonparametric.smoothers_lowess import lowess
@@ -24,6 +23,24 @@ input_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_
 
 #fig_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/figs/'
 #input_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX//LSTM_MTM/input_data/'
+
+## Plot setup
+
+plt.rcParams.update({
+    "text.usetex": True,
+    "font.family": "serif",
+    "font.serif": ['Computer Modern']})
+
+SMALL_SIZE = 8
+MEDIUM_SIZE = 12
+BIGGER_SIZE = 18
+plt.rc('font', size=BIGGER_SIZE)          # controls default text sizes
+plt.rc('axes', titlesize=BIGGER_SIZE)     # fontsize of the axes title
+plt.rc('axes', labelsize=BIGGER_SIZE)    # fontsize of the x and y labels
+plt.rc('xtick', labelsize=BIGGER_SIZE)    # fontsize of the tick labels
+plt.rc('ytick', labelsize=BIGGER_SIZE)    # fontsize of the tick labels
+plt.rc('legend', fontsize=MEDIUM_SIZE)    # legend fontsize
+plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 ##### METHODS #####
 
@@ -168,29 +185,27 @@ def smoothing(data, method, window_size=None, poly_order=None, lowess_frac = Non
 def plot_inputdata(cases,data,dpi=150):
     ### looping over the number of features (Nd and IA)
 
-    #Plot setup
-    rc('text', usetex=True)
-    custom_font = {'family': 'serif', 'serif': ['Computer Modern Roman']}
-    rc('font', **custom_font)
-
     features = ['Number of drops', 'Interfacial Area']
-    num_features = data.shape[-1]
     colors = sns.color_palette("husl", len(cases))
 
     # Create a single figure with multiple subplots
-    fig, axes = plt.subplots(num_features, figsize=(10, 6 * num_features), dpi=dpi, num=1)
-    plt.tight_layout()
+    fig, axes = plt.subplots(1,2, figsize=(12, 8), dpi=dpi, num=1)
 
     for i, ax in enumerate(axes):
         ax.set_title(f'{features[i]}')
         ax.set_xlabel('Time steps')
         ax.set_ylabel(f'Scaled {features[i]}')
 
-        for case, idx in zip(cases, range(len(cases))):
+        for spine in ax.spines.values():
+            spine.set_linewidth(1.5)
+
+        for idx, case in enumerate(cases):
             ax.plot(data[:, idx, i], label=f'{str(case)}', color=colors[idx % len(colors)])
-            ax.legend()
+            ax.tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', length=5, width=1.5)
+            ax.grid(color='k', linestyle=':', linewidth=0.1)
 
     fig.suptitle(f'Input data: {features}', fontsize=18)
+    axes[0].legend()
 
     plt.tight_layout()
     plt.savefig(os.path.join(fig_savepath,'input_data'),dpi=dpi)
@@ -200,23 +215,35 @@ def plot_smoothdata(data, smoothed_data, method, cases,dpi=150):
     
     fig, ax = plt.subplots(1,2, figsize=(12,8), dpi=dpi, num=2)
     colors = sns.color_palette("husl", len(cases))
+    features = ['Number of drops', 'Interfacial Area']
 
-    for case, idx in zip(cases, range(len(cases))):
-        ax[0].plot(data[:,idx], label = f'{str(case)}',color=colors[idx % len(colors)])
-        ax[0].set_title('Data before')
-        ax[0].set_xlabel('Time steps')
-        ax[0].set_ylabel('Scaled data')
-        
-        ax[1].plot(smoothed_data[:,idx], label = f'{str(case)}',color=colors[idx % len(colors)])
-        ax[1].set_title('Data after')
-        ax[1].set_xlabel('Time steps')
-        ax[1].set_ylabel('Smoothed data')
+    for feature in range(len(features)):
+        for idx, _ in enumerate(cases):
+
+            ax[0].plot(data[:,idx,feature],color=colors[idx % len(colors)])
+            ax[0].set_title('Data before')
+            ax[0].set_xlabel('Time steps')
+            ax[0].set_ylabel('Scaled data')
+            ax[0].tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', length=5, width=1.5)
+            ax[0].grid(color='k', linestyle=':', linewidth=0.1)
+            
+            ax[1].plot(smoothed_data[:,idx,feature],color=colors[idx % len(colors)])
+            ax[1].set_title('Data after')
+            ax[1].set_xlabel('Time steps')
+            ax[1].set_ylabel('Smoothed data')
+            ax[1].tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', length=5, width=1.5)
+            ax[1].grid(color='k', linestyle=':', linewidth=0.1)
     
     fig.suptitle(f'Smoothing method: {method}', fontsize=18)
 
-    ax[0].legend()
-    plt.savefig(os.path.join(fig_savepath,'smoothed_data'),dpi=dpi)
+    ax[1].legend(labels=[f'{str(case)}' for case in cases])
+
+    for ax in ax:
+        for spine in ax.spines.values():
+            spine.set_linewidth(1.5)
+        
     plt.tight_layout()
+    plt.savefig(os.path.join(fig_savepath,'smoothed_data'),dpi=dpi)
     plt.show()
 
 ## main ##

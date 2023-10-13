@@ -10,8 +10,8 @@ import pickle
 import os
 import seaborn as sns
 import matplotlib.pyplot as plt
-from matplotlib import rc
 import torch
+import random
 import numpy as np
 import torch.nn as nn
 import torch.optim as optim
@@ -29,6 +29,24 @@ trainedmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/
 #fig_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/figs/'
 #input_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX//LSTM_MTM/input_data/'
 #trainedmod_savepath = ''
+
+## Plot setup
+
+plt.rcParams.update({
+    "text.usetex": True,
+    "font.family": "serif",
+    "font.serif": ['Computer Modern']})
+
+SMALL_SIZE = 8
+MEDIUM_SIZE = 12
+BIGGER_SIZE = 18
+plt.rc('font', size=BIGGER_SIZE)          # controls default text sizes
+plt.rc('axes', titlesize=BIGGER_SIZE)     # fontsize of the axes title
+plt.rc('axes', labelsize=BIGGER_SIZE)    # fontsize of the x and y labels
+plt.rc('xtick', labelsize=BIGGER_SIZE)    # fontsize of the tick labels
+plt.rc('ytick', labelsize=BIGGER_SIZE)    # fontsize of the tick labels
+plt.rc('legend', fontsize=MEDIUM_SIZE)    # legend fontsize
+plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 ##################################### CLASSES #################################################
 
@@ -66,10 +84,6 @@ class Window_data():
         "Test": sns.color_palette("Set3", len(case_labels))
     }
         
-        rc('text', usetex=True)
-        custom_font = {'family': 'serif', 'serif': ['Computer Modern Roman']}
-        rc('font', **custom_font)
-
         train_cases = splitset_labels[0]
         val_cases = splitset_labels[1]
         test_cases = splitset_labels[2]
@@ -82,6 +96,10 @@ class Window_data():
 
             fig, ax = plt.subplots(1, 2, figsize=(12, 5))
             color_palette = color_palettes[label]
+          
+            for axis in ax:
+                for spine in axis.spines.values():
+                    spine.set_linewidth(1.5)
 
             ## Looping per feature number in each split set
             for i in range(data.shape[-1]):
@@ -91,6 +109,8 @@ class Window_data():
                     ax[i].set_title(f'{label}: {features[i]}')
                     ax[i].set_xlabel('Time steps')
                     ax[i].set_ylabel(f'Scaled {features[i]}')
+                    ax[i].tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', length=5, width=1.5)
+                    ax[i].grid(color='k', linestyle=':', linewidth=0.1)
                     ax[i].legend()
 
             ## saving figures
@@ -192,6 +212,107 @@ class LSTM_DMS(nn.Module):
         else:
             return 0
 
+class LSTM_encoder(nn.Module):
+
+    # Same as LSTM DMS constructor but with no pred_steps or linear layer as encoder feeds decoder LSTM through the hidden states
+    def __init__(self,input_size,hidden_size, num_layers=1):
+        super(LSTM_encoder,self).__init__()
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+
+        self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, 
+                            batch_first=True)
+        
+    # Take the input sequences and output the hidden states for the LSTM decoder section
+    def forward(self, encoder_input):
+        ''' 
+        return encoder_hidden_states: outputs the last time hidden and cell state to be fed into the LSTM decoder
+        
+        input shape: (batch_size, input steps/input window, input_size=num_features)
+        output shape: (input_size=num_features, hidden_size)
+        '''
+        _, (h_n_encoder,c_n_encoder) = self.lstm(encoder_input) #ignoring output (hidden states) for all times and only saving a tuple with the last timestep cell and hidden state
+        
+        return (h_n_encoder,c_n_encoder)
+
+class LSTM_decoder(nn.Module):
+
+    ## Same constructor as DMS as now we are decoding the final LSTM cell through a linear layer to generate the final output 
+    def __init__(self, input_size, hidden_size, output_size, num_layers=1):
+        super(LSTM_decoder, self).__init__()
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.output_size = output_size
+        self.num_layers = num_layers
+        
+        self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, 
+                            batch_first=True)
+        
+        self.linear = nn.Linear(hidden_size, output_size)
+
+    def forward(self, decoder_input, encoder_states):
+        '''
+        return 
+        lstm_output: returns decoded hidden states as output for all times 
+        
+        input shape: (batch_size, 1, input_size=num_features) the last time step
+        output shape: (batch_size, input_size=num_features)
+        '''
+
+        # LSTM cell is initialized with the encoder cell and hidden states
+                # Input tensor is unsqueezed to introduce an additional dimension in axis = 1 to perform LSTM calculations normally for 1 step
+        lstm_output, _ = self.lstm(decoder_input.unsqueeze(1), encoder_states) #Similar to DMS, output is saved, representing all hidden states per timestep
+        
+        ## output tensor is squeezed, removing the aritificial time dimension in axis = 1, as it will be looped during prediction for each time and appended to a 3D tensor.
+        output = self.linear(lstm_output.squeeze(1))
+        
+        return output
+    
+class LSTM_S2S(nn.Module):
+    ''' Double LSTM Encoder-decoder architecture to make predictions '''
+
+    #Constructing the encoder decoder LSTM architecture
+    def __init__(self, input_size, hidden_size, output_size, pred_steps):
+        super(LSTM_S2S,self).__init__()
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.output_size = output_size
+        self.pred_steps = pred_steps #steps out = output window
+        
+        self.encoder = LSTM_encoder(input_size=input_size, hidden_size=hidden_size)
+        self.decoder = LSTM_decoder(input_size=input_size, hidden_size=hidden_size, output_size=output_size)
+
+    def forward(self,input_tensor):
+        '''
+        input_tensor: shape (batch_size, input steps = input window, input_size=num_features)
+        pred_steps: number of time steps to predict
+        return np_outputs: array containing predictions
+        '''
+                
+        # encode input_tensor
+        encoder_states = self.encoder(input_tensor)
+
+        # initialize output tensor for prediction
+        outputs = torch.zeros(input_tensor.shape[0], self.pred_steps, input_tensor.shape[2]) #shape = batch_size, steps_out, num_features
+
+
+        # decode input_tensor
+        decoder_input = input_tensor[:,-1,:] # Taking last value in the window/sequence
+        decoder_input_states = encoder_states
+
+        # predictions carried out on the decoder for each time in the output window = steps_out
+        for t in range(self.pred_steps):
+            decoder_output = self.decoder(decoder_input,decoder_input_states)
+            outputs[:,t,:] = decoder_output
+            # prediction done recursively
+            decoder_input = decoder_output
+
+        np_outputs = outputs.detach().numpy() ## detaching from gradient requirements during prediction
+
+        return torch.from_numpy(np_outputs)
+
+
 ####################################### TRAINING FUN. #####################################
 
 def train_DMS(model, optimizer, loss_fn, loader, scheduler,
@@ -263,11 +384,139 @@ def train_DMS(model, optimizer, loss_fn, loader, scheduler,
                 print('Early stopping')
                 break
 
+def train_S2S(model, optimizer, loss_fn, loader,scheduler, num_epochs, 
+              check_epochs, pred_steps, X_train, y_train, X_val, y_val, 
+              training_prediction, tf_ratio, dynamic_tf,saveas):
+    ''' 
+    training_prediction: ('recursive'/'teacher_forcing'/'mixed')
+    tf_ratio: float[0,1] 
+                relevance on teacher forcing when training_prediction = 'teacher_forcing'.
+                For each batch, a random number is generated. 
+                If the number is less than tf_ratio, tf is used; otherwise, prediction is done recursively.
+                If tf_ratio = 1, only tf is used.
+    dynamic_tf: (True/False)
+                dynamic teacher forcing reduces the amount of teacher forcing for each epoch
+    
+    return loss: array of loss function for each epoch
+    '''
+
+    # save the training model
+    with open(str(saveas)+'.txt', 'w') as f:
+        print(model, file=f)
+
+        ### Early stopping feature to avoid overfitting during training, monitoring a minimum improvement threshold
+        early_stop = EarlyStopping('S2S',patience=10, verbose=True)
+
+        for epoch in range(num_epochs): #looping through training epochs
+            
+            model.train() #setting model to training function to deactivate regularization and other training features
+            first_iteration = True
+
+            for X_batch, y_batch in loader:
+
+                # initializing output tensor
+                outputs = torch.zeros(X_batch.shape[0], pred_steps, X_batch.shape[2]) #shape = (batch_size,steps_out,num_features)
+
+                #reset gradients from previous training step
+                optimizer.zero_grad()
+
+                #going through the LSTM encoder layer: return hidden and cell states
+                encoder_states = model.encoder(X_batch)
+
+                # decoder starting with teacher forcing: input set as last timestep from input batch
+                decoder_input = X_batch[:,-1,:] # in shape of (batch_size, input_size = num_features)
+                decoder_input_states = encoder_states
+
+                #Considering variations in training methods per batch
+                if training_prediction == 'recursive':
+                        
+                    # recursive prediction: predicted output is fed
+                        for t in range(pred_steps):
+                            decoder_output = model.decoder(decoder_input, decoder_input_states)
+                            outputs[:,t,:] = decoder_output
+                            decoder_input = decoder_output
+
+
+                if training_prediction == 'teacher_forcing':
+                        
+                    # predict using teacher forcing: target is fed
+                        if random.random() < tf_ratio:
+                            for t in range(pred_steps):
+                                decoder_output = model.decoder(decoder_input, decoder_input_states)
+                                outputs[:,t,:] = decoder_output
+                                decoder_input = y_batch[:,t,:] # target fed from y_batch in shape of (batch_size, input_size = num_features)
+                        # predict recursively
+                        else:
+                            for t in range(pred_steps):
+                                decoder_output = model.decoder(decoder_input, decoder_input_states)
+                                outputs[:,t,:] = decoder_output
+                                decoder_input = decoder_output
+
+
+                if training_prediction == 'mixed':
+
+                    # both types of training methods used in the same batch, alternating stochastically based on tf_ratio
+                    for t in range(pred_steps):
+                        decoder_output = model.decoder(decoder_input, decoder_input_states)
+                        outputs[:,t,:] = decoder_output
+
+                        ## Teaching method chosen per timestep within the given batch
+                        # teacher forcing
+                        if random.random() < tf_ratio:
+                            decoder_input = y_batch[:,t,:]
+                        # recursive:
+                        else:
+                            decoder_input = decoder_output
+
+                loss = loss_fn(outputs,y_batch)
+
+                # Backpropagation and parameter update
+                loss.backward() # calculating the gradient of the loss with respect to the model's parameters (weights and biases)
+                                # it acculmulates the gradients each time we go through the nested loop
+
+                optimizer.step() # updating parameters to minimize the loss function
+
+                # Check the shapes in the first iteration of the first epoch
+                if epoch == 0 and first_iteration:
+                    print('Input shape:', X_batch.shape)
+                    print('Output shape:', outputs.shape)
+                    first_iteration = False
+                
+            # dynamic teacher forcing
+            if dynamic_tf and tf_ratio > 0:
+                tf_ratio = tf_ratio - 0.02 ## if dynamic tf active, the amount of teacher forcing is reduced per epoch
+
+                # Validation at each check epoch batch
+            if epoch % check_epochs != 0:
+                continue
+
+            model.eval() # set the model to evaluation form, disabling regularisation and training features
+
+            with torch.no_grad(): #predictions performed with no gradient calculations
+                y_pred_train = model(X_train)
+                y_pred_val = model(X_val)
+
+                t_rmse = loss_fn(y_pred_train, y_train)
+                v_rmse = loss_fn(y_pred_val, y_val)
+
+                print('Epoch %d : train RMSE  %.4f, val RMSE %.4f ' % (epoch, t_rmse, v_rmse), file=f)
+                print('Epoch %d : train RMSE  %.4f, val RMSE %.4f ' % (epoch, t_rmse, v_rmse))
+                
+            ## Learning rate scheduler step
+            scheduler.step(v_rmse)
+
+            ## early stopping check to avoid overfitting
+            early_stop(v_rmse, model)
+
+            if early_stop.early_stop:
+                print('Early stopping')
+                break
+
 ########################################### MAIN ###########################################
 
 def main():
 
-    ### WINDOW DATA ###
+    ####### WINDOW DATA ########
 
     ## Class instance declarations:
     windowing = Window_data()
@@ -311,7 +560,7 @@ def main():
     print(f"Windowed input validation data shape: {X_val.shape}")
     print(f"Validation windowed output shape: {y_val.shape}")
 
-    ### LSTM MODEL TRAINING ###
+    ######### LSTM MODEL TRAINING ##########
 
     # Define hyperparameters
     input_size = X_train.shape[-1]  # Number of features in the input tensor
@@ -324,9 +573,13 @@ def main():
     num_epochs = 3000
     check_epochs = 100
 
+    tf_ratio = 0.1
+    dynamic_tf = False
+
     # customize loss function 
     penalty_weight = 10
     loss_fn = custom_loss(penalty_weight)
+    loader = data.DataLoader(data.TensorDataset(X_train, y_train), shuffle=True, batch_size=batch_size)
         
     ## Calling model class instance and training function
     model_choice = input('Select a LSTM model to train (DMS, S2S): ')
@@ -336,7 +589,6 @@ def main():
         model = LSTM_DMS(input_size, hidden_size, output_size, pred_steps,
                             l1_lambda=0.00, l2_lambda=0.00)
         
-        loader = data.DataLoader(data.TensorDataset(X_train, y_train), shuffle=True, batch_size=batch_size)
         optimizer = optim.Adam(model.parameters(), lr = learning_rate) # optimizer to estimate weights and biases (backpropagation)
             
         # Learning rate scheduler, set on min mode to decrease by factor when validation loss stops decreasing                                       
@@ -349,13 +601,22 @@ def main():
         
     elif model_choice == 'S2S':
         # LSTM model instance
-        model = LSTM_DMS(input_size, hidden_size, output_size, pred_steps,
-                        l1_lambda=0.00, l2_lambda=0.00)
+        model = LSTM_S2S(input_size, hidden_size, output_size, pred_steps)
         
+        optimizer = optim.Adam(model.parameters(), lr = learning_rate) # optimizer to estimate weights and biases (backpropagation)
+        
+        # Learning rate scheduler, set on min mode to decrease by factor when validation loss stops decreasing                                       
+        scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=True)
+        
+        train_S2S(model,optimizer, loss_fn, loader, scheduler, num_epochs, 
+                  check_epochs,pred_steps,X_train,y_train, X_val, y_val,
+                  training_prediction= 'mixed',tf_ratio=tf_ratio,
+                  dynamic_tf=dynamic_tf,saveas='S2S_out')
+
     else:
         raise ValueError('Model selected is not configured/does not exist. Double check input.')
 
-    ### SAVING ALL RELEVANT DATA ###
+    ######## SAVING ALL RELEVANT DATA ########
 
     set_labels = ["train", "val", "test"]
     arrays = [train_arr, val_arr, test_arr]
@@ -397,7 +658,9 @@ def main():
         "learning_rate": learning_rate,
         "num_epochs": num_epochs,
         "steps_in": steps_in,
-        "steps_out": steps_out
+        "steps_out": steps_out,
+        "tf_ratio": tf_ratio,
+        "dynamic_tf": False
     }
 
     with open(os.path.join(trainedmod_savepath,f'hyperparams_{model_choice}.txt'), "w") as file:
