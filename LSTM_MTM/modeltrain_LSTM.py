@@ -22,13 +22,13 @@ from tools_modeltraining import custom_loss, EarlyStopping
 
 ## Env. variables ##
 
-fig_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/figs/'
-input_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/input_data/'
-trainedmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/trained_models/'
+#fig_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/figs/'
+#input_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/input_data/'
+#trainedmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/trained_models/'
 
-#fig_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/figs/'
-#input_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX//LSTM_MTM/input_data/'
-#trainedmod_savepath = ''
+fig_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/figs/'
+input_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX//LSTM_MTM/input_data/'
+trainedmod_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/trained_models'
 
 ## Plot setup
 
@@ -312,7 +312,6 @@ class LSTM_S2S(nn.Module):
 
         return torch.from_numpy(np_outputs)
 
-
 ####################################### TRAINING FUN. #####################################
 
 def train_DMS(model, optimizer, loss_fn, loader, scheduler,
@@ -486,7 +485,7 @@ def train_S2S(model, optimizer, loss_fn, loader,scheduler, num_epochs,
             if dynamic_tf and tf_ratio > 0:
                 tf_ratio = tf_ratio - 0.02 ## if dynamic tf active, the amount of teacher forcing is reduced per epoch
 
-                # Validation at each check epoch batch
+            # Validation at each check epoch batch
             if epoch % check_epochs != 0:
                 continue
 
@@ -569,12 +568,12 @@ def main():
     output_size = y_train.shape[-1]  # Number of output features, same as input in this case
     pred_steps = steps_out # Number of future steps to predict
     batch_size = 10 # How many windows are being processed per pass through the LSTM
-    learning_rate = 0.01
+    learning_rate = 0.005
     num_epochs = 3000
     check_epochs = 100
 
-    tf_ratio = 0.1
-    dynamic_tf = False
+    tf_ratio = 0.15
+    dynamic_tf = True
 
     # customize loss function 
     penalty_weight = 10
@@ -660,7 +659,7 @@ def main():
         "steps_in": steps_in,
         "steps_out": steps_out,
         "tf_ratio": tf_ratio,
-        "dynamic_tf": False
+        "dynamic_tf": dynamic_tf
     }
 
     with open(os.path.join(trainedmod_savepath,f'hyperparams_{model_choice}.txt'), "w") as file:
