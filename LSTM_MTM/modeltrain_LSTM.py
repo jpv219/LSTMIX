@@ -46,7 +46,19 @@ plt.rc('axes', labelsize=BIGGER_SIZE)    # fontsize of the x and y labels
 plt.rc('xtick', labelsize=BIGGER_SIZE)    # fontsize of the tick labels
 plt.rc('ytick', labelsize=BIGGER_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=MEDIUM_SIZE)    # legend fontsize
-plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure titlefine_labels
+
+fine_labels = {
+    # svcases #
+    'Bi0001': r'$Bi=0.001$', 'Bi0002': r'$Bi=0.002$', 'Bi0004': r'$Bi=0.004$', 'Bi001': r'$Bi=0.01$', 'Bi1': r'$Bi=1$',
+    'B05': r'$Bi=0.1, \beta=0.5$','B07': r'$Bi=0.1, \beta=0.7$', 'B09': r'$Bi=0.1, \beta=0.9$',
+    'clean': r'Clean',
+    # smx cases #
+    'b03': r'$\beta=0.3$','b06':r'$\beta=0.6$','bi001':r'$Bi=0.01$','bi01':r'$Bi=0.1$','da01': r'$Da=0.1$','da1':r'$Da=1$',
+    'b06pm':r'$\beta=0.6$,','b09pm':r'$\beta=0.9$,','bi001pm':r'$Bi=0.01$,',
+    'bi1':r'$Bi=1$','bi01pm':r'$Bi=0.1$,','3drop':r'3-Drop',
+    'b09':r'$\beta=0.9$','da01pm':r'$Da=0.1$, ','da001':r'$Da=0.01$', 'coarsepm':r'coarse pm'
+}
 
 ##################################### CLASSES #################################################
 
@@ -74,7 +86,7 @@ class Window_data():
         return train, val, test, (train_cases, val_cases, test_cases)
 
     ## plot split data sets   
-    def plot_split_cases(self, data, splitset_labels, train, val, test, 
+    def plot_split_cases(self, data, fine_labels, splitset_labels, train, val, test, 
                         features, case_labels, dpi=150):
 
         #Plot setup
@@ -105,7 +117,8 @@ class Window_data():
             for i in range(data.shape[-1]):
 
                 for case, idx in zip(case_labels, range(len(case_labels))):
-                    ax[i].plot(split_set[:,idx,i],label = f'{str(case)}',color=color_palette[idx % len(color_palette)])
+                    plot_label = fine_labels.get(case,case)
+                    ax[i].plot(split_set[:,idx,i],label = f'{plot_label}',color=color_palette[idx % len(color_palette)])
                     ax[i].set_title(f'{label}: {features[i]}')
                     ax[i].set_xlabel('Time steps')
                     ax[i].set_ylabel(f'Scaled {features[i]}')
@@ -543,7 +556,7 @@ def main():
     ## plotting split data
     plot_choice = input('plot split data sets? (y/n) :')
     if plot_choice.lower() == 'y' or plot_choice.lower() == 'yes':
-        windowing.plot_split_cases(input_df, splitset_labels, train_arr, val_arr, test_arr, 
+        windowing.plot_split_cases(input_df, fine_labels, splitset_labels, train_arr, val_arr, test_arr, 
                             features,svcases)
     else:
         pass
