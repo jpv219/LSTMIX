@@ -18,11 +18,10 @@ import pickle
 import psutil
 
 import ray
-from ray import tune
-from ray.air import Checkpoint, session
+from ray import train, tune
+from ray.train import Checkpoint
 from ray.tune.schedulers import ASHAScheduler
-from ray.tune.search.hyperopt import HyperOptSearch
-from functools import partial
+
 
 ## Env. variables ##
 

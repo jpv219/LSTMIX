@@ -22,13 +22,13 @@ from tools_modeltraining import custom_loss, EarlyStopping
 
 ## Env. variables ##
 
-#fig_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/figs/'
-#input_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/input_data/'
-#trainedmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/trained_models/'
+fig_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/figs/'
+input_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/input_data/'
+trainedmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/trained_models/'
 
-fig_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/figs/'
-input_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX//LSTM_MTM/input_data/'
-trainedmod_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/trained_models'
+#fig_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/figs/'
+#input_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX//LSTM_MTM/input_data/'
+#trainedmod_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/trained_models'
 
 ## Plot setup
 
@@ -273,7 +273,8 @@ class LSTM_S2S(nn.Module):
     ''' Double LSTM Encoder-decoder architecture to make predictions '''
 
     #Constructing the encoder decoder LSTM architecture
-    def __init__(self, input_size, hidden_size, output_size, pred_steps):
+    def __init__(self, input_size, hidden_size, output_size, pred_steps,
+                 l1_lambda=0.0, l2_lambda=0.0):
         super(LSTM_S2S,self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -311,12 +312,34 @@ class LSTM_S2S(nn.Module):
         np_outputs = outputs.detach().numpy() ## detaching from gradient requirements during prediction
 
         return torch.from_numpy(np_outputs)
+    
+
+    ### Regularization functions to prevent overfitting
+    #L1 (lasso) encourages sparse weights
+    def l1_regularization_loss(self):
+        if self.training:
+            l1_loss = 0.0
+            for param in self.parameters():
+                l1_loss += torch.sum(torch.abs(param))
+            return self.l1_lambda * l1_loss
+        else:
+            return 0
+
+    #L2 (Ridge) encourages small weights
+    def l2_regularization_loss(self):
+        if self.training:
+            l2_loss = 0.0
+            for param in self.parameters():
+                l2_loss += torch.sum(param ** 2)
+            return 0.5 * self.l2_lambda * l2_loss
+        else:
+            return 0
 
 ####################################### TRAINING FUN. #####################################
 
-def train_DMS(model, optimizer, loss_fn, loader, scheduler,
+def train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler,
                   num_epochs, check_epochs, 
-                  X_train, y_train, X_val, y_val, saveas):
+                  X_train, y_train, X_val, y_val, saveas,batch_loss = False):
     
     with open(str(saveas)+'.txt', 'w') as f:
         print(model, file=f)
@@ -328,7 +351,7 @@ def train_DMS(model, optimizer, loss_fn, loader, scheduler,
             model.train() #set the model to train mode -- informing features to behave accordingly for training
             
             first_iteration = True
-            for X_batch, y_batch in loader:
+            for X_batch, y_batch in trainloader:
                 
                 optimizer.zero_grad() # setting gradients to zero to start a new run on weight optimisation (clear accumulated from previous batch)
 
@@ -361,14 +384,44 @@ def train_DMS(model, optimizer, loss_fn, loader, scheduler,
             if epoch % check_epochs != 0:
                 continue
 
-            model.eval() # set the model to evaluation form
+            model.eval() # set the model to evaluation form, disabling regularisation and training features
 
-            with torch.no_grad(): #predictions performed with no gradient calculations
-                y_pred_train = model(X_train)
-                y_pred_val = model(X_val)
+            with torch.no_grad():  # Predictions performed with no gradient calculations        
+                ## Checking if we want to compute model loss in a staggered (minibatch) manner
+                if batch_loss:
+                    train_loss = 0
+                    val_loss = 0
+                    steps_train = 0
+                    steps_val = 0
 
-                t_rmse = loss_fn(y_pred_train, y_train)
-                v_rmse = loss_fn(y_pred_val, y_val)
+                    ## calculating loss per batch and accumulating
+                    for traindata in trainloader:
+                        X_trbatch, y_trbatch = traindata
+                        tr_output = model(X_trbatch)
+
+                        lss1 = loss_fn(tr_output, y_trbatch)
+                        train_loss += lss1.numpy()
+                        steps_train += 1
+
+                    for valdata in valloader:
+                        X_valbatch, y_valbatch = valdata
+                        val_output = model(X_valbatch)
+
+                        lss2 = loss_fn(val_output, y_valbatch)
+                        val_loss += lss2.numpy()
+                        steps_val += 1
+
+                    # Arithmetic average based on the number of batches per train/val loader
+                    t_rmse = train_loss / steps_train
+                    v_rmse = val_loss / steps_val
+                
+                ## Single loss over entire validation data set.
+                else:
+                    y_pred_train = model(X_train)
+                    y_pred_val = model(X_val)
+
+                    t_rmse = loss_fn(y_pred_train, y_train)
+                    v_rmse = loss_fn(y_pred_val, y_val)
 
                 print('Epoch %d : train RMSE  %.4f, val RMSE %.4f ' % (epoch, t_rmse, v_rmse), file=f)
                 print('Epoch %d : train RMSE  %.4f, val RMSE %.4f ' % (epoch, t_rmse, v_rmse))
@@ -383,9 +436,9 @@ def train_DMS(model, optimizer, loss_fn, loader, scheduler,
                 print('Early stopping')
                 break
 
-def train_S2S(model, optimizer, loss_fn, loader,scheduler, num_epochs, 
+def train_S2S(model, optimizer, loss_fn, trainloader,valloader,scheduler, num_epochs, 
               check_epochs, pred_steps, X_train, y_train, X_val, y_val, 
-              training_prediction, tf_ratio, dynamic_tf,saveas):
+              training_prediction, tf_ratio, dynamic_tf,saveas,batch_loss=False):
     ''' 
     training_prediction: ('recursive'/'teacher_forcing'/'mixed')
     tf_ratio: float[0,1] 
@@ -411,7 +464,7 @@ def train_S2S(model, optimizer, loss_fn, loader,scheduler, num_epochs,
             model.train() #setting model to training function to deactivate regularization and other training features
             first_iteration = True
 
-            for X_batch, y_batch in loader:
+            for X_batch, y_batch in trainloader:
 
                 # initializing output tensor
                 outputs = torch.zeros(X_batch.shape[0], pred_steps, X_batch.shape[2]) #shape = (batch_size,steps_out,num_features)
@@ -469,6 +522,13 @@ def train_S2S(model, optimizer, loss_fn, loader,scheduler, num_epochs,
 
                 loss = loss_fn(outputs,y_batch)
 
+                # Calculate L1 and L2 regularization terms
+                l1_regularization = model.l1_regularization_loss()
+                l2_regularization = model.l2_regularization_loss()
+
+                # Add regularization terms to the loss
+                loss += l1_regularization + l2_regularization
+
                 # Backpropagation and parameter update
                 loss.backward() # calculating the gradient of the loss with respect to the model's parameters (weights and biases)
                                 # it acculmulates the gradients each time we go through the nested loop
@@ -491,12 +551,43 @@ def train_S2S(model, optimizer, loss_fn, loader,scheduler, num_epochs,
 
             model.eval() # set the model to evaluation form, disabling regularisation and training features
 
-            with torch.no_grad(): #predictions performed with no gradient calculations
-                y_pred_train = model(X_train)
-                y_pred_val = model(X_val)
+            with torch.no_grad():  # Predictions performed with no gradient calculations        
+                ## Checking if we want to compute model loss in a staggered (minibatch) manner
+                if batch_loss:
+                    train_loss = 0
+                    val_loss = 0
+                    steps_train = 0
+                    steps_val = 0
 
-                t_rmse = loss_fn(y_pred_train, y_train)
-                v_rmse = loss_fn(y_pred_val, y_val)
+                    ## calculating loss per batch and accumulating
+                    for traindata in trainloader:
+                        X_trbatch, y_trbatch = traindata
+                        tr_output = model(X_trbatch)
+
+                        lss1 = loss_fn(tr_output, y_trbatch)
+                        train_loss += lss1.numpy()
+                        steps_train += 1
+
+                    for valdata in valloader:
+                        X_valbatch, y_valbatch = valdata
+                        val_output = model(X_valbatch)
+
+                        lss2 = loss_fn(val_output, y_valbatch)
+                        val_loss += lss2.numpy()
+                        steps_val += 1
+
+                    # Arithmetic average based on the number of batches per train/val loader
+                    t_rmse = train_loss / steps_train
+                    v_rmse = val_loss / steps_val
+                
+                ## Single loss over entire validation data set.
+                else:
+                    y_pred_train = model(X_train)
+                    y_pred_val = model(X_val)
+
+                    t_rmse = loss_fn(y_pred_train, y_train)
+                    v_rmse = loss_fn(y_pred_val, y_val)
+
 
                 print('Epoch %d : train RMSE  %.4f, val RMSE %.4f ' % (epoch, t_rmse, v_rmse), file=f)
                 print('Epoch %d : train RMSE  %.4f, val RMSE %.4f ' % (epoch, t_rmse, v_rmse))
@@ -578,7 +669,8 @@ def main():
     # customize loss function 
     penalty_weight = 10
     loss_fn = custom_loss(penalty_weight)
-    loader = data.DataLoader(data.TensorDataset(X_train, y_train), shuffle=True, batch_size=batch_size)
+    trainloader = data.DataLoader(data.TensorDataset(X_train, y_train), shuffle=True, batch_size=batch_size)
+    valloader = data.DataLoader(data.TensorDataset(X_val, y_val), shuffle=True, batch_size=batch_size)
         
     ## Calling model class instance and training function
     model_choice = input('Select a LSTM model to train (DMS, S2S): ')
@@ -593,24 +685,24 @@ def main():
         # Learning rate scheduler, set on min mode to decrease by factor when validation loss stops decreasing                                       
         scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=True)
         
-        train_DMS(model=model, optimizer=optimizer, loss_fn=loss_fn, loader=loader, scheduler=scheduler, 
-            num_epochs=num_epochs, check_epochs=check_epochs,
-            X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val,
-            saveas='DMS_out')
+        train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler, 
+            num_epochs, check_epochs, X_train, y_train, X_val, 
+            y_val,saveas='DMS_out',batch_loss=True)
         
     elif model_choice == 'S2S':
         # LSTM model instance
-        model = LSTM_S2S(input_size, hidden_size, output_size, pred_steps)
+        model = LSTM_S2S(input_size, hidden_size, output_size, pred_steps,
+                         l1_lambda=0.00, l2_lambda=0.00)
         
         optimizer = optim.Adam(model.parameters(), lr = learning_rate) # optimizer to estimate weights and biases (backpropagation)
         
         # Learning rate scheduler, set on min mode to decrease by factor when validation loss stops decreasing                                       
         scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=True)
         
-        train_S2S(model,optimizer, loss_fn, loader, scheduler, num_epochs, 
+        train_S2S(model,optimizer, loss_fn, trainloader, valloader, scheduler, num_epochs, 
                   check_epochs,pred_steps,X_train,y_train, X_val, y_val,
                   training_prediction= 'mixed',tf_ratio=tf_ratio,
-                  dynamic_tf=dynamic_tf,saveas='S2S_out')
+                  dynamic_tf=dynamic_tf,saveas='S2S_out',batch_loss=True)
 
     else:
         raise ValueError('Model selected is not configured/does not exist. Double check input.')
