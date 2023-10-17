@@ -18,6 +18,11 @@ import torch.optim as optim
 import torch.utils.data as data
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from tools_modeltraining import custom_loss, EarlyStopping
+from collections import namedtuple
+
+## For tuning
+from ray import train
+from ray.train import Checkpoint
 
 
 ## Env. variables ##
@@ -25,6 +30,7 @@ from tools_modeltraining import custom_loss, EarlyStopping
 fig_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/figs/'
 input_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/input_data/'
 trainedmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/trained_models/'
+tuningmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/tuning/'
 
 #fig_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/figs/'
 #input_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX//LSTM_MTM/input_data/'
@@ -280,6 +286,10 @@ class LSTM_S2S(nn.Module):
         self.hidden_size = hidden_size
         self.output_size = output_size
         self.pred_steps = pred_steps #steps out = output window
+
+        # Relevance markers for L1 and L2 regularizations
+        self.l1_lambda = l1_lambda
+        self.l2_lambda = l2_lambda
         
         self.encoder = LSTM_encoder(input_size=input_size, hidden_size=hidden_size)
         self.decoder = LSTM_decoder(input_size=input_size, hidden_size=hidden_size, output_size=output_size)
@@ -297,7 +307,6 @@ class LSTM_S2S(nn.Module):
         # initialize output tensor for prediction
         outputs = torch.zeros(input_tensor.shape[0], self.pred_steps, input_tensor.shape[2]) #shape = batch_size, steps_out, num_features
 
-
         # decode input_tensor
         decoder_input = input_tensor[:,-1,:] # Taking last value in the window/sequence
         decoder_input_states = encoder_states
@@ -313,7 +322,6 @@ class LSTM_S2S(nn.Module):
 
         return torch.from_numpy(np_outputs)
     
-
     ### Regularization functions to prevent overfitting
     #L1 (lasso) encourages sparse weights
     def l1_regularization_loss(self):
@@ -335,17 +343,152 @@ class LSTM_S2S(nn.Module):
         else:
             return 0
 
+##################################### WINDOWING FUN. #################################################
+
+def windowing(steps_in,steps_out,stride):
+    ## Class instance declarations:
+    windowing = Window_data()
+
+    ## namedtuple used to return all data arrays
+    WindowedData = namedtuple('WindowedData', [
+    'X_train', 'y_train', 'train_casebatch',
+    'X_val', 'y_val', 'val_casebatch',
+    'train_arr', 'val_arr', 'test_arr', 'splitset_labels'
+    ])
+
+    Allcases = ['b03','b06','bi001','bi01','da01','da1','b06pm','b09pm','bi001pm',
+    'bi1','bi01pm','3drop',
+    'b09','da01pm','da001', 'coarsepm']
+
+    features = ['Number of drops', 'Interfacial Area']
+
+    # Reading saved re-shaped input data from file
+    with open(os.path.join(input_savepath,'inputdata.pkl'), 'rb') as file:
+        input_df = pickle.load(file)
+    
+    ## data splitting for training, validating and testing
+    train_frac = 0.5625
+    test_frac = 0.25
+
+    train_arr, val_arr, test_arr, splitset_labels = windowing.split_cases(
+        input_df, train_frac, test_frac, Allcases)
+    
+    ## plotting split data
+    plot_choice = input('plot split data sets? (y/n) :')
+    if plot_choice.lower() == 'y' or plot_choice.lower() == 'yes':
+        windowing.plot_split_cases(input_df, splitset_labels, train_arr, val_arr, test_arr, 
+                            features,Allcases)
+    else:
+        pass
+
+
+    #Windowed training data
+    X_train, y_train, train_casebatch = windowing.window_data(train_arr, steps_in, stride, steps_out)
+    #Windowed validation data
+    X_val, y_val, val_casebatch = windowing.window_data(val_arr, steps_in, stride, steps_out)
+
+    print(f"Windowed input training data shape: {X_train.shape}")
+    print(f"Training windowed output shape: {y_train.shape}")
+    print(f"Windowed input validation data shape: {X_val.shape}")
+    print(f"Validation windowed output shape: {y_val.shape}")
+
+    return WindowedData(
+        X_train=X_train, y_train=y_train, train_casebatch=train_casebatch,
+        X_val=X_val, y_val=y_val, val_casebatch=val_casebatch,
+        train_arr=train_arr, val_arr=val_arr, test_arr=test_arr,
+        splitset_labels=splitset_labels
+    )
+
+####################################### SAVING FUN. #####################################
+
+def saving_data(wd,hp,model_choice):
+    
+    set_labels = ["train", "val", "test"]
+    arrays = [wd.train_arr, wd.val_arr, wd.test_arr]
+    input_tensors = [wd.X_train, wd.X_val]
+    out_tensors = [wd.y_train, wd.y_val]
+    casebatches = [wd.train_casebatch,wd.val_casebatch]
+
+    ## saving train, validation and test data sets previously split and used as input for windowing process, with corresponding labels
+    for setlbl, arr, caselbl_list in zip(set_labels, arrays, wd.splitset_labels):
+
+        save_dict = {
+        f"{setlbl}_arr": arr,
+        "splitset_labels": caselbl_list
+    }
+        with open(os.path.join(trainedmod_savepath,f'data_sets_{model_choice}', f'{setlbl}_pkg.pkl'), 'wb') as file:
+            pickle.dump(save_dict, file)
+
+        print(f"Saved split set data and labels {setlbl}_pkg.pkl")
+
+    ## saving windowed train and validation datasets (pytorch tensors), with corresponding casebatch lengths  
+    for setlbl, in_tens, out_tens, csbatch in zip(set_labels, input_tensors, out_tensors, casebatches):
+        
+        save_indict = {
+        "windowed_data": in_tens,
+        f"{setlbl}_casebatch": csbatch
+        }
+        save_outdict = {
+        "windowed_data": out_tens,
+        f"{setlbl}_casebatch": csbatch
+        }
+
+        file_in = os.path.join(trainedmod_savepath,f'data_sets_{model_choice}', f'X_{setlbl}.pt')
+        file_out = os.path.join(trainedmod_savepath,f'data_sets_{model_choice}', f'y_{setlbl}.pt')
+
+        torch.save(save_indict, file_in)
+        torch.save(save_outdict, file_out)
+
+        print(f"Saved torch package X_{setlbl}.pt")
+        print(f"Saved torch package y_{setlbl}.pt")
+    
+    ## save hyperparameters used for model trained for later plotting and rollout prediction
+    hyperparams = {
+        "input_size": hp.input_size,
+        "hidden_size": hp.hidden_size,
+        "output_size": hp.output_size,
+        "pred_steps": hp.pred_steps,
+        "batch_size": hp.batch_size,
+        "learning_rate": hp.learning_rate,
+        "num_epochs": hp.num_epochs,
+        "check_epochs": hp.check_epochs,
+        "steps_in": hp.steps_in,
+        "steps_out": hp.steps_out,
+        "tf_ratio": hp.tf_ratio,
+        "dynamic_tf": hp.dynamic_tf
+    }
+
+    with open(os.path.join(trainedmod_savepath,f'hyperparams_{model_choice}.txt'), "w") as file:
+
+        for key, value in hyperparams.items():
+            file.write(f"{key}: {value}\n")
+
 ####################################### TRAINING FUN. #####################################
 
 def train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler,
                   num_epochs, check_epochs, 
-                  X_train, y_train, X_val, y_val, saveas,batch_loss = False):
+                  X_train, y_train, X_val, y_val, saveas,
+                  batch_loss = False,tuning=False):
     
+    model_name = 'DMS'
+
     with open(str(saveas)+'.txt', 'w') as f:
         print(model, file=f)
 
         ### Early stopping feature to avoid overfitting during training, monitoring a minimum improvement threshold
-        early_stopping = EarlyStopping('DMS',patience=10, verbose=True)
+        early_stopping = EarlyStopping(model_name,patience=10, verbose=True)
+
+        ## If a checkpoint state is going to be further trained (e.g., from Ray Tune parametric sweep)
+        if tuning:
+            ## Get checkpoint from Ray train feature
+            loaded_checkpoint = train.get_checkpoint()
+            if loaded_checkpoint:
+                with loaded_checkpoint.as_directory() as loaded_checkpoint_dir:
+                    model_state, optimizer_state = torch.load(
+                        os.path.join(loaded_checkpoint_dir, f'{model_name}_chkpnt.pt'))
+                    
+                    model.load_state_dict(model_state)
+                    optimizer.load_state_dict(optimizer_state)
 
         for epoch in range(num_epochs): #looping through epochs
             model.train() #set the model to train mode -- informing features to behave accordingly for training
@@ -430,7 +573,11 @@ def train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler,
             scheduler.step(v_rmse)
 
             ## early stopping check to avoid overfitting
-            early_stopping(v_rmse, model)
+            early_stopping(v_rmse, model,optimizer,tuning)
+
+            if tuning:
+                checkpoint = Checkpoint.from_directory(os.path.join(tuningmod_savepath,model_name))
+                train.report({"val_loss": v_rmse, "train_loss": t_rmse}, checkpoint=checkpoint)
 
             if early_stopping.early_stop:
                 print('Early stopping')
@@ -438,7 +585,8 @@ def train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler,
 
 def train_S2S(model, optimizer, loss_fn, trainloader,valloader,scheduler, num_epochs, 
               check_epochs, pred_steps, X_train, y_train, X_val, y_val, 
-              training_prediction, tf_ratio, dynamic_tf,saveas,batch_loss=False):
+              tf_ratio, dynamic_tf,training_prediction,saveas,
+              batch_loss=False,tuning=False):
     ''' 
     training_prediction: ('recursive'/'teacher_forcing'/'mixed')
     tf_ratio: float[0,1] 
@@ -451,13 +599,26 @@ def train_S2S(model, optimizer, loss_fn, trainloader,valloader,scheduler, num_ep
     
     return loss: array of loss function for each epoch
     '''
+    model_name = 'S2S'
 
     # save the training model
     with open(str(saveas)+'.txt', 'w') as f:
         print(model, file=f)
 
         ### Early stopping feature to avoid overfitting during training, monitoring a minimum improvement threshold
-        early_stop = EarlyStopping('S2S',patience=10, verbose=True)
+        early_stopping = EarlyStopping(model_name,patience=10, verbose=True)
+
+        ## If a checkpoint state is going to be further trained (e.g., from Ray Tune parametric sweep)
+        if tuning:
+            ## Get checkpoint from Ray train feature
+            loaded_checkpoint = train.get_checkpoint()
+            if loaded_checkpoint:
+                with loaded_checkpoint.as_directory() as loaded_checkpoint_dir:
+                    model_state, optimizer_state = torch.load(
+                        os.path.join(loaded_checkpoint_dir, f'{model_name}_chkpnt.pt'))
+                    
+                    model.load_state_dict(model_state)
+                    optimizer.load_state_dict(optimizer_state)
 
         for epoch in range(num_epochs): #looping through training epochs
             
@@ -596,9 +757,13 @@ def train_S2S(model, optimizer, loss_fn, trainloader,valloader,scheduler, num_ep
             scheduler.step(v_rmse)
 
             ## early stopping check to avoid overfitting
-            early_stop(v_rmse, model)
+            early_stopping(v_rmse, model,optimizer,tuning)
 
-            if early_stop.early_stop:
+            if tuning:
+                checkpoint = Checkpoint.from_directory(os.path.join(tuningmod_savepath,model_name))
+                train.report({"val_loss": v_rmse, "train_loss": t_rmse}, checkpoint=checkpoint)
+
+            if early_stopping.early_stop:
                 print('Early stopping')
                 break
 
@@ -608,57 +773,26 @@ def main():
 
     ####### WINDOW DATA ########
 
-    ## Class instance declarations:
-    windowing = Window_data()
-
-    Allcases = ['b03','b06','bi001','bi01','da01','da1','b06pm','b09pm','bi001pm',
-    'bi1','bi01pm','3drop',
-    'b09','da01pm','da001', 'coarsepm']
-
-    features = ['Number of drops', 'Interfacial Area']
-
-    # Reading saved re-shaped input data from file
-    with open(os.path.join(input_savepath,'inputdata.pkl'), 'rb') as file:
-        input_df = pickle.load(file)
-    
-    ## data splitting for training, validating and testing
-    train_frac = 0.5625
-    test_frac = 0.25
-
-    train_arr, val_arr, test_arr, splitset_labels = windowing.split_cases(
-        input_df, train_frac, test_frac, Allcases)
-    
-    ## plotting split data
-    plot_choice = input('plot split data sets? (y/n) :')
-    if plot_choice.lower() == 'y' or plot_choice.lower() == 'yes':
-        windowing.plot_split_cases(input_df, splitset_labels, train_arr, val_arr, test_arr, 
-                            features,Allcases)
-    else:
-        pass
-    
     ## Windowing hyperparameters
     steps_in, steps_out = 36, 20
     stride = 1
-    
-    #Windowed training data
-    X_train, y_train, train_casebatch = windowing.window_data(train_arr, steps_in, stride, steps_out)
-    #Windowed validation data
-    X_val, y_val, val_casebatch = windowing.window_data(val_arr, steps_in, stride, steps_out)
 
-    print(f"Windowed input training data shape: {X_train.shape}")
-    print(f"Training windowed output shape: {y_train.shape}")
-    print(f"Windowed input validation data shape: {X_val.shape}")
-    print(f"Validation windowed output shape: {y_val.shape}")
+    windowed_data = windowing(steps_in,steps_out,stride)
+
+    ## Extracting from named tuple
+    X_train = windowed_data.X_train
+    y_train = windowed_data.y_train
+    X_val = windowed_data.X_val
+    y_val = windowed_data.y_val
 
     ######### LSTM MODEL TRAINING ##########
 
     # Define hyperparameters
     input_size = X_train.shape[-1]  # Number of features in the input tensor
     hidden_size = 128  # Number of hidden units in the LSTM cell, determines how many weights will be used in the hidden state calculations
-    num_layers = 1 # Number of LSTM layers per unit
     output_size = y_train.shape[-1]  # Number of output features, same as input in this case
     pred_steps = steps_out # Number of future steps to predict
-    batch_size = 10 # How many windows are being processed per pass through the LSTM
+    batch_size = 20 # How many windows are being processed per pass through the LSTM
     learning_rate = 0.005
     num_epochs = 3000
     check_epochs = 100
@@ -687,7 +821,7 @@ def main():
         
         train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler, 
             num_epochs, check_epochs, X_train, y_train, X_val, 
-            y_val,saveas='DMS_out',batch_loss=True)
+            y_val,saveas='DMS_out',batch_loss=False)
         
     elif model_choice == 'S2S':
         # LSTM model instance
@@ -701,65 +835,27 @@ def main():
         
         train_S2S(model,optimizer, loss_fn, trainloader, valloader, scheduler, num_epochs, 
                   check_epochs,pred_steps,X_train,y_train, X_val, y_val,
-                  training_prediction= 'mixed',tf_ratio=tf_ratio,
-                  dynamic_tf=dynamic_tf,saveas='S2S_out',batch_loss=True)
+                  tf_ratio, dynamic_tf, training_prediction= 'mixed',
+                  saveas='S2S_out',batch_loss=False)
 
     else:
         raise ValueError('Model selected is not configured/does not exist. Double check input.')
 
     ######## SAVING ALL RELEVANT DATA ########
 
-    set_labels = ["train", "val", "test"]
-    arrays = [train_arr, val_arr, test_arr]
-    windowed_tensors = [X_train, X_val]
-    casebatches = [train_casebatch,val_casebatch]
-
-    ## saving train, validation and test data sets previously split and used as input for windowing process, with corresponding labels
-    for setlbl, arr, caselbl_list in zip(set_labels, arrays, splitset_labels):
-
-        save_dict = {
-        f"{setlbl}_arr": arr,
-        "splitset_labels": caselbl_list
-    }
-        with open(os.path.join(trainedmod_savepath,f'data_sets_{model_choice}', f'{setlbl}_pkg.pkl'), 'wb') as file:
-            pickle.dump(save_dict, file)
-
-        print(f"Saved split set data and labels {setlbl}_pkg.pkl")
-
-    ## saving windowed train and validation datasets (pytorch tensors), with corresponding casebatch lengths  
-    for setlbl, tens, csbatch in zip(set_labels, windowed_tensors, casebatches):
-        
-        save_dict = {
-        "windowed_data": tens,
-        f"{setlbl}_casebatch": csbatch
-    }
-        file = os.path.join(trainedmod_savepath,f'data_sets_{model_choice}', f'X_{setlbl}.pt')
-
-        torch.save(save_dict, file)
-
-        print(f"Saved torch package X_{setlbl}.pt")
+    ## namedtuple used to store all hyperparams and send as a single arg to save_func
+    HyperParams = namedtuple('HyperParams', [
+    'input_size', 'hidden_size', 'output_size',
+    'pred_steps', 'batch_size', 'learning_rate',
+    'num_epochs', 'check_epochs', 'steps_in', 'steps_out', 'tf_ratio', 'dynamic_tf'
+        ])
     
-    ## save hyperparameters used for model trained for later plotting and rollout prediction
-    hyperparams = {
-        "input_size": input_size,
-        "hidden_size": hidden_size,
-        "output_size": output_size,
-        "pred_steps": pred_steps,
-        "batch_size": batch_size,
-        "learning_rate": learning_rate,
-        "num_epochs": num_epochs,
-        "steps_in": steps_in,
-        "steps_out": steps_out,
-        "tf_ratio": tf_ratio,
-        "dynamic_tf": dynamic_tf
-    }
+    hyper_params = HyperParams(input_size=input_size, hidden_size=hidden_size, output_size=output_size,
+    pred_steps=pred_steps, batch_size=batch_size, learning_rate=learning_rate, num_epochs=num_epochs,
+    check_epochs=check_epochs, steps_in=steps_in, steps_out=steps_out, tf_ratio=tf_ratio, dynamic_tf=dynamic_tf
+    )
 
-    with open(os.path.join(trainedmod_savepath,f'hyperparams_{model_choice}.txt'), "w") as file:
-
-        for key, value in hyperparams.items():
-            file.write(f"{key}: {value}\n")
-    
-
+    saving_data(windowed_data,hyper_params,model_choice)
 
 if __name__ == "__main__":
     main()

@@ -12,6 +12,7 @@ import torch.nn as nn
 
 ## Env. variables ##
 trainedmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/trained_models/'
+tuningmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/tuning/'
 
 #trainedmod_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/trained_models/'
 
@@ -41,11 +42,11 @@ class custom_loss(nn.Module):
         return custom_loss 
 
 class EarlyStopping:
-    def __init__(self, model_name, patience=5, verbose=False, delta=0.0001):
+    def __init__(self, model_name, patience=2, verbose=False, delta=0.0001):
         """
         Args:
             patience (int): How long to wait after last improvement in the monitored metric.
-                            Default: 5
+                            Default: 2
             verbose (bool): If True, print a message for each validation loss improvement.
                             Default: False
             delta (float): Minimum change in the monitored metric to be considered an improvement.
@@ -59,7 +60,7 @@ class EarlyStopping:
         self.early_stop = False
         self.name = model_name
 
-    def __call__(self, val_loss, model):
+    def __call__(self, val_loss, model,optimizer,tuning=False):
         """
         Args:
             val_loss (float): Validation loss to be monitored for improvement.
@@ -69,7 +70,7 @@ class EarlyStopping:
 
         if self.best_score is None:
             self.best_score = score
-            self.save_checkpoint(val_loss, model)
+            self.save_checkpoint(val_loss, model,optimizer,tuning)
         elif score < self.best_score + self.delta:
             self.counter += 1
             if self.verbose:
@@ -78,13 +79,18 @@ class EarlyStopping:
                 self.early_stop = True
         else:
             self.best_score = score
-            self.save_checkpoint(val_loss, model)
+            self.save_checkpoint(val_loss, model,optimizer,tuning)
             self.counter = 0
 
-    def save_checkpoint(self, val_loss, model):
+    def save_checkpoint(self, val_loss, model,optimizer,tuning):
         """
         Saves model when validation loss decreases.
         """
         if self.verbose:
             print(f'Validation loss decreased ({self.best_score:.6f} --> {val_loss:.6f}). Saving model...')
-        torch.save(model.state_dict(), os.path.join(trainedmod_savepath,f'{self.name}_trained_model.pt'))  # Save the model's state_dict.
+        # Save the model's state_dict.
+        torch.save(model.state_dict(), os.path.join(trainedmod_savepath,f'{self.name}_trained_model.pt'))
+
+        if tuning:
+            torch.save((model.state_dict(), optimizer.state_dict()), 
+                       os.path.join(tuningmod_savepath,self.name,f'{self.name}_chkpnt.pt'))
