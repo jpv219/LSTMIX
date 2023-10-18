@@ -25,10 +25,15 @@ from ray.tune.schedulers import ASHAScheduler
 
 ## Env. variables ##
 
-fig_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/figs/'
-input_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/input_data/'
-trainedmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/trained_models/'
-tuning_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/tuning'
+# fig_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/figs/'
+# input_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/input_data/'
+# trainedmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/trained_models/'
+# tuning_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/tuning'
+
+fig_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/figs/'
+input_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/input_data/'
+trainedmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/trained_models/'
+tuningmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/tuning/'
 
 ########################################### METHODS ###########################################
 
@@ -59,7 +64,7 @@ def train_tune(config, model_choice, init, X_tens, y_tens):
         ## Calling training function
         trn.train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler, 
             init["num_epochs"], init["check_epochs"], X_tens[0], y_tens[0], X_tens[1], 
-            y_tens[1],saveas='DMS_out',batch_loss=config["batch_loss"])
+            y_tens[1],saveas='DMS_out',batch_loss=config["batch_loss"],tuning=True)
         
 
     elif model_choice == 'S2S':
@@ -74,7 +79,7 @@ def train_tune(config, model_choice, init, X_tens, y_tens):
         trn.train_S2S(model,optimizer, loss_fn, trainloader, valloader, scheduler, init["num_epochs"], 
                   init["check_epochs"],init["pred_steps"],X_tens[0], y_tens[0], X_tens[1], y_tens[1],
                   config["tf_ratio"], config["dynamic_tf"], config["training_prediction"],
-                  saveas='S2S_out',batch_loss=config["batch_loss"])
+                  saveas='S2S_out',batch_loss=config["batch_loss"],tuning=True)
 
     else:
         raise ValueError('Model selected is not configured/does not exist. Double check input.')
@@ -133,7 +138,7 @@ def main():
     X_tens, y_tens, _, _ ,_, _ = load_data(model_choice)
 
     # limit the number of CPU cores used for the whole tuning process
-    percent_cpu_to_occupy = 0.2
+    percent_cpu_to_occupy = 0.3
     total_cpus = psutil.cpu_count(logical=False)
     num_cpus_to_allocate = int(total_cpus * percent_cpu_to_occupy)
 
@@ -145,8 +150,8 @@ def main():
         'training_prediction': tune.choice(['teacher_forcing', 'mixed']),
         'tf_ratio': tune.choice([0.05,0.1,0.3,0.5,0.7]),
         'dynamic_tf': tune.choice(['True', 'False']),
-        'l1_lambda' : tune.loguniform(0, 0.1),
-        'l2_lambda' : tune.loguniform(0, 0.1),
+        'l1_lambda' : tune.loguniform(0.0001, 0.1),
+        'l2_lambda' : tune.loguniform(0.0001, 0.1),
         'batch_loss' : tune.choice(['True', 'False']),
         'penalty_weight' : tune.choice([0.6,0.7,0.8,0.9])
     }
@@ -160,7 +165,7 @@ def main():
     }
 
     scheduler = ASHAScheduler(
-    metric='loss',
+    metric='val_loss',
     mode='min',
     max_t= init["num_epochs"],
     grace_period=20, # save period without early stopping
@@ -176,7 +181,7 @@ def main():
     config = search_space,
     num_samples = 200, # number of hyperparameter configuration to try
     scheduler=scheduler,
-    local_dir = os.path.join(tuning_savepath,model_choice)
+    local_dir = os.path.join(tuningmod_savepath,model_choice)
 )
     
     best_trial = tuner.get_best_trial('loss', 'min', 'last')
