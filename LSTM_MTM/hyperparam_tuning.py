@@ -179,7 +179,7 @@ def main():
     partial(train_tune,model_choice=model_choice,
             init=init,X_tens=X_tens,y_tens=y_tens),
     config = search_space,
-    num_samples = 200, # number of hyperparameter configuration to try
+    num_samples = 50, # number of hyperparameter configuration to try
     scheduler=scheduler,
     local_dir = os.path.join(tuningmod_savepath,model_choice)
 )
