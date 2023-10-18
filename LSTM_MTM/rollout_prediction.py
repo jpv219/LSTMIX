@@ -64,6 +64,7 @@ def rollout(model, input_seq, steps_out,total_steps):
         for _ in range(num_forwards):
 
             output = model(rolled_predictions[-1]) #LSTM pass with latest prediction window as input
+            ## Input size for model prediction changes from initial steps in to steps out, as we take last prediction as new input
 
             rolled_predictions.append(output.detach().clone())
 
@@ -112,12 +113,8 @@ def plot_model_pred(model,model_name,features,set_labels,set,
                         markerfacecolor=p[0].get_color(),alpha=0.8, markeredgewidth=1.5, markeredgecolor='k',
                         lw=0.0, label=f'Pred. {str(case)}')
                 
-        if f_idx == 1:
-            plt.ylim(0.6, 1.1)
-
-
         plt.legend()
-        plt.xlim(30, 110)
+        plt.xlim(0, 110)
         plt.ylim(0)
         plt.title(f'Prediction with LSTM {model_name} for {features[f_idx]} in {set} set')
         plt.xlabel('Time steps')
@@ -135,7 +132,7 @@ def plot_rollout_pred(rollout_seq, true_data, features,set_labels, model_name):
     num_features = len(features)
 
     for f_idx in range(num_features):
-        fig = plt.figure()
+        fig = plt.figure(figsize=(12,6))
 
         for i, case in enumerate(set_labels):
             ## truedata shaped as (timesteps, cases, features) and rollout as (case,timestep,features)
@@ -153,7 +150,7 @@ def plot_rollout_pred(rollout_seq, true_data, features,set_labels, model_name):
         
         plt.legend()
         plt.title(f'Rollout pred with LSTM {model_name} for: {features[f_idx]}')
-        plt.xlim(30, 110)
+        plt.xlim(0, 110)
         plt.ylim(0)
         plt.xlabel('Time steps')
         plt.ylabel(f'Scaled {features[f_idx]}')

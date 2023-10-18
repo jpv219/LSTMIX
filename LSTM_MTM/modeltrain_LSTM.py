@@ -388,9 +388,9 @@ def windowing(steps_in,steps_out,stride):
     X_val, y_val, val_casebatch = windowing.window_data(val_arr, steps_in, stride, steps_out)
 
     print(f"Windowed input training data shape: {X_train.shape}")
-    print(f"Training windowed output shape: {y_train.shape}")
+    print(f"Windowed output training shape: {y_train.shape}")
     print(f"Windowed input validation data shape: {X_val.shape}")
-    print(f"Validation windowed output shape: {y_val.shape}")
+    print(f"Windowed output validation shape: {y_val.shape}")
 
     return WindowedData(
         X_train=X_train, y_train=y_train, train_casebatch=train_casebatch,
@@ -476,7 +476,7 @@ def train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler,
         print(model, file=f)
 
         ### Early stopping feature to avoid overfitting during training, monitoring a minimum improvement threshold
-        early_stopping = EarlyStopping(model_name,patience=10, verbose=True)
+        early_stopping = EarlyStopping(model_name,patience=5, verbose=True)
 
         ## If a checkpoint state is going to be further trained (e.g., from Ray Tune parametric sweep)
         if tuning:
@@ -606,7 +606,7 @@ def train_S2S(model, optimizer, loss_fn, trainloader,valloader,scheduler, num_ep
         print(model, file=f)
 
         ### Early stopping feature to avoid overfitting during training, monitoring a minimum improvement threshold
-        early_stopping = EarlyStopping(model_name,patience=10, verbose=True)
+        early_stopping = EarlyStopping(model_name,patience=5, verbose=True)
 
         ## If a checkpoint state is going to be further trained (e.g., from Ray Tune parametric sweep)
         if tuning:
@@ -774,7 +774,7 @@ def main():
     ####### WINDOW DATA ########
 
     ## Windowing hyperparameters
-    steps_in, steps_out = 36, 20
+    steps_in, steps_out = 30, 15
     stride = 1
 
     windowed_data = windowing(steps_in,steps_out,stride)
