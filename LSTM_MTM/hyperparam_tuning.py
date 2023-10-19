@@ -179,12 +179,12 @@ def main():
     partial(train_tune,model_choice=model_choice,
             init=init,X_tens=X_tens,y_tens=y_tens),
     config = search_space,
-    num_samples = 50, # number of hyperparameter configuration to try
+    num_samples = 5, # number of hyperparameter configuration to try
     scheduler=scheduler,
     local_dir = os.path.join(tuningmod_savepath,model_choice)
 )
     
-    best_trial = tuner.get_best_trial('loss', 'min', 'last')
+    best_trial = tuner.get_best_trial('val_loss', 'min', 'last')
 
     print(f'Best trial id: {best_trial.trial_id}')
     print(f'Best trial config: {best_trial.config}')
