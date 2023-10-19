@@ -24,8 +24,8 @@ import pickle
 #fig_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/figs/'
 #input_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX//LSTM_MTM/input_data/'
 
-fig_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/figs/'
-input_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/input_data/'
+fig_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/figs/'
+input_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/input_data/'
 
 ## Plot setup
 
@@ -253,30 +253,32 @@ def plot_smoothdata(data, smoothed_data, method, cases,dpi=150):
 
 def main():
 
-    Allcases = ['b03','b06','bi001','bi01','da01','da1','b06pm','b09pm','bi001pm',
-    'bi1','bi01pm','3drop',
-    'b09','da01pm','da001', 'coarsepm']
+    # Allcases = ['b03','b06','bi001','bi01','da01','da1','b06pm','b09pm','bi001pm',
+    # 'bi1','bi01pm','3drop',
+    # 'b09','da01pm','da001', 'coarsepm']
+
+    svcases = ['Bi0001','Bi0002','Bi0004','Bi001','B05', 'B07', 'B09', 'Bi1','clean']
 
     # List of columns to be normalized
     norm_columns = ['Nd', 'IA']
 
     # scaled input data 
-    post_dict = scale_inputs(Allcases,norm_columns)
+    post_dict = scale_inputs(svcases,norm_columns)
 
     # re-shaped input data
     shaped_input = shape_inputdata(post_dict)
 
     #plotting
-    plot_inputdata(Allcases,shaped_input)
+    plot_inputdata(svcases,shaped_input)
 
     # smoothing data
     smoothed_data = smoothing(shaped_input,'savgol',window_size=5,poly_order=3)
 
-    plot_smoothdata(shaped_input, smoothed_data, 'savgol', Allcases)
+    plot_smoothdata(shaped_input, smoothed_data, 'savgol', svcases)
 
     ## saving input data 
 
-    with open(os.path.join(input_savepath,'inputdata.pkl'),'wb') as file:
+    with open(os.path.join(input_savepath,'svinputdata.pkl'),'wb') as file:
         pickle.dump(smoothed_data,file)
 
 if __name__ == "__main__":
