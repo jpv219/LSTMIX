@@ -7,7 +7,7 @@
 #########################################################################################################################################################
 
 import pickle
-import os
+import os,tempfile
 import seaborn as sns
 import matplotlib.pyplot as plt
 import torch
@@ -23,6 +23,7 @@ from collections import namedtuple
 ## For tuning
 from ray import train
 from ray.train import Checkpoint
+import ray.cloudpickle as raypickle
 
 
 ## Env. variables ##
@@ -36,10 +37,10 @@ from ray.train import Checkpoint
 #input_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX//LSTM_MTM/input_data/'
 #trainedmod_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/trained_models'
 
-fig_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/figs/'
-input_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/input_data/'
-trainedmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/trained_models/'
-tuningmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/tuning/'
+fig_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/figs/'
+input_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/input_data/'
+trainedmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/trained_models/'
+tuningmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/tuning/'
 
 ## Plot setup
 
@@ -482,15 +483,15 @@ def train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler,
 
         ## If a checkpoint state is going to be further trained (e.g., from Ray Tune parametric sweep)
         if tuning:
-            ## Get checkpoint from Ray train feature
+            # Get checkpoint from Ray train feature
             loaded_checkpoint = train.get_checkpoint()
             if loaded_checkpoint:
                 with loaded_checkpoint.as_directory() as loaded_checkpoint_dir:
-                    model_state, optimizer_state = torch.load(
-                        os.path.join(loaded_checkpoint_dir, 'checkpoint.pt'))
-                    
-                    model.load_state_dict(model_state)
-                    optimizer.load_state_dict(optimizer_state)
+                    with open(os.path.join(loaded_checkpoint_dir, 'chk_dict.pkl'),'rb') as fp:
+                        loaded_checkpoint_state = raypickle.load(fp)
+                        
+                        model.load_state_dict(loaded_checkpoint_state['model_state_dict'])
+                        optimizer.load_state_dict(loaded_checkpoint_state['optimizer_state_dict'])
 
         else:
             ### Early stopping feature to avoid overfitting during training, monitoring a minimum improvement threshold
@@ -577,9 +578,14 @@ def train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler,
                 
             ## If in tuning mode, save checkpoint for model and optimizer state, and register checkpoint with train.report.
             if tuning:
-                torch.save((model.state_dict(), optimizer.state_dict()),os.path.join(tuningmod_savepath,model_name,'checkpoint.pt'))
-                checkpoint = Checkpoint.from_directory(os.path.join(tuningmod_savepath,model_name))
-                train.report({"val_loss": v_rmse, "train_loss": t_rmse}, checkpoint=checkpoint)
+                with tempfile.TemporaryDirectory() as checkpoint_dir:
+                    with open(os.path.join(checkpoint_dir, 'chk_dict.pkl'), 'wb') as fp:
+                        raypickle.dump({'epoch': epoch,
+                                     'model_state_dict': model.state_dict(),
+                                     'optimizer_state_dict': optimizer.state_dict()},fp)
+                        
+                    checkpoint = Checkpoint.from_directory(os.path.join(checkpoint_dir))
+                    train.report({"val_loss": v_rmse, "train_loss": t_rmse}, checkpoint=checkpoint)
 
             else:
                 ## Learning rate scheduler step
@@ -618,15 +624,15 @@ def train_S2S(model, optimizer, loss_fn, trainloader,valloader,scheduler, num_ep
 
         ## If a checkpoint state is going to be further trained (e.g., from Ray Tune parametric sweep)
         if tuning:
-            ## Get checkpoint from Ray train feature
+            # Get checkpoint from Ray train feature
             loaded_checkpoint = train.get_checkpoint()
             if loaded_checkpoint:
                 with loaded_checkpoint.as_directory() as loaded_checkpoint_dir:
-                    model_state, optimizer_state = torch.load(
-                        os.path.join(loaded_checkpoint_dir, 'checkpoint.pt'))
-                    
-                    model.load_state_dict(model_state)
-                    optimizer.load_state_dict(optimizer_state)
+                    with open(os.path.join(loaded_checkpoint_dir, 'chk_dict.pkl'),'rb') as fp:
+                        loaded_checkpoint_state = raypickle.load(fp)
+                        
+                        model.load_state_dict(loaded_checkpoint_state['model_state_dict'])
+                        optimizer.load_state_dict(loaded_checkpoint_state['optimizer_state_dict'])
         else:
             ### Early stopping feature to avoid overfitting during training, monitoring a minimum improvement threshold
             early_stopping = EarlyStopping(model_name,patience=5, verbose=True)
@@ -766,9 +772,14 @@ def train_S2S(model, optimizer, loss_fn, trainloader,valloader,scheduler, num_ep
                 
             ## If in tuning mode, save checkpoint for model and optimizer state, and register checkpoint with train.report.
             if tuning:
-                torch.save((model.state_dict(), optimizer.state_dict()),os.path.join(tuningmod_savepath,model_name,'checkpoint.pt'))
-                checkpoint = Checkpoint.from_directory(os.path.join(tuningmod_savepath,model_name))
-                train.report({"val_loss": v_rmse, "train_loss": t_rmse}, checkpoint=checkpoint)
+                with tempfile.TemporaryDirectory() as checkpoint_dir:
+                    with open(os.path.join(checkpoint_dir, 'chk_dict.pkl'), 'wb') as fp:
+                        raypickle.dump({'epoch': epoch,
+                                     'model_state_dict': model.state_dict(),
+                                     'optimizer_state_dict': optimizer.state_dict()},fp)
+                        
+                    checkpoint = Checkpoint.from_directory(os.path.join(checkpoint_dir))
+                    train.report({"val_loss": v_rmse, "train_loss": t_rmse}, checkpoint=checkpoint)
 
             else:
                 ## Learning rate scheduler step

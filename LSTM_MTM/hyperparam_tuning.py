@@ -30,10 +30,10 @@ from ray.tune.schedulers import ASHAScheduler
 # trainedmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/trained_models/'
 # tuning_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/tuning'
 
-fig_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/figs/'
-input_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/input_data/'
-trainedmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/trained_models/'
-tuningmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/tuning/'
+fig_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/figs/'
+input_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMXLSTM_MTM/input_data/'
+trainedmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/trained_models/'
+tuningmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/tuning/'
 
 ########################################### METHODS ###########################################
 
@@ -179,12 +179,12 @@ def main():
     partial(train_tune,model_choice=model_choice,
             init=init,X_tens=X_tens,y_tens=y_tens),
     config = search_space,
-    num_samples = 50, # number of hyperparameter configuration to try
+    num_samples = 5, # number of hyperparameter configuration to try
     scheduler=scheduler,
     local_dir = os.path.join(tuningmod_savepath,model_choice)
 )
     
-    best_trial = tuner.get_best_trial('loss', 'min', 'last')
+    best_trial = tuner.get_best_trial('val_loss', 'min', 'last')
 
     print(f'Best trial id: {best_trial.trial_id}')
     print(f'Best trial config: {best_trial.config}')
