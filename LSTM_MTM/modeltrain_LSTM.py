@@ -22,7 +22,7 @@ from collections import namedtuple
 
 ## For tuning
 from ray import train
-from ray.train import Checkpoint, session
+from ray.train import Checkpoint
 
 
 ## Env. variables ##
@@ -480,9 +480,6 @@ def train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler,
     with open(str(saveas)+'.txt', 'w') as f:
         print(model, file=f)
 
-        ### Early stopping feature to avoid overfitting during training, monitoring a minimum improvement threshold
-        early_stopping = EarlyStopping(model_name,patience=5, verbose=True)
-
         ## If a checkpoint state is going to be further trained (e.g., from Ray Tune parametric sweep)
         if tuning:
             ## Get checkpoint from Ray train feature
@@ -490,10 +487,14 @@ def train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler,
             if loaded_checkpoint:
                 with loaded_checkpoint.as_directory() as loaded_checkpoint_dir:
                     model_state, optimizer_state = torch.load(
-                        os.path.join(loaded_checkpoint_dir, f'{model_name}_chkpnt.pt'))
+                        os.path.join(loaded_checkpoint_dir, 'checkpoint.pt'))
                     
                     model.load_state_dict(model_state)
                     optimizer.load_state_dict(optimizer_state)
+
+        else:
+            ### Early stopping feature to avoid overfitting during training, monitoring a minimum improvement threshold
+            early_stopping = EarlyStopping(model_name,patience=5, verbose=True)
 
         for epoch in range(num_epochs): #looping through epochs
             model.train() #set the model to train mode -- informing features to behave accordingly for training
@@ -574,19 +575,24 @@ def train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler,
                 print('Epoch %d : train RMSE  %.4f, val RMSE %.4f ' % (epoch, t_rmse, v_rmse), file=f)
                 print('Epoch %d : train RMSE  %.4f, val RMSE %.4f ' % (epoch, t_rmse, v_rmse))
                 
-            ## Learning rate scheduler step
-            scheduler.step(v_rmse)
-
-            ## early stopping check to avoid overfitting
-            early_stopping(v_rmse, model,optimizer,tuning)
-
+            ## If in tuning mode, save checkpoint for model and optimizer state, and register checkpoint with train.report.
             if tuning:
+                torch.save((model.state_dict(), optimizer.state_dict()),os.path.join(tuningmod_savepath,model_name,'checkpoint.pt'))
                 checkpoint = Checkpoint.from_directory(os.path.join(tuningmod_savepath,model_name))
                 train.report({"val_loss": v_rmse, "train_loss": t_rmse}, checkpoint=checkpoint)
 
-            if early_stopping.early_stop:
-                print('Early stopping')
-                break
+            else:
+                ## Learning rate scheduler step
+                scheduler.step(v_rmse)
+
+                ## early stopping check to avoid overfitting
+                early_stopping(v_rmse, model,optimizer,tuning)
+
+                if early_stopping.early_stop:
+                    print('Early stopping')
+                    break
+
+    print('Finished training')
 
 def train_S2S(model, optimizer, loss_fn, trainloader,valloader,scheduler, num_epochs, 
               check_epochs, pred_steps, X_train, y_train, X_val, y_val, 
@@ -610,9 +616,6 @@ def train_S2S(model, optimizer, loss_fn, trainloader,valloader,scheduler, num_ep
     with open(str(saveas)+'.txt', 'w') as f:
         print(model, file=f)
 
-        ### Early stopping feature to avoid overfitting during training, monitoring a minimum improvement threshold
-        early_stopping = EarlyStopping(model_name,patience=5, verbose=True)
-
         ## If a checkpoint state is going to be further trained (e.g., from Ray Tune parametric sweep)
         if tuning:
             ## Get checkpoint from Ray train feature
@@ -620,10 +623,13 @@ def train_S2S(model, optimizer, loss_fn, trainloader,valloader,scheduler, num_ep
             if loaded_checkpoint:
                 with loaded_checkpoint.as_directory() as loaded_checkpoint_dir:
                     model_state, optimizer_state = torch.load(
-                        os.path.join(loaded_checkpoint_dir, f'{model_name}_chkpnt.pt'))
+                        os.path.join(loaded_checkpoint_dir, 'checkpoint.pt'))
                     
                     model.load_state_dict(model_state)
                     optimizer.load_state_dict(optimizer_state)
+        else:
+            ### Early stopping feature to avoid overfitting during training, monitoring a minimum improvement threshold
+            early_stopping = EarlyStopping(model_name,patience=5, verbose=True)
 
         for epoch in range(num_epochs): #looping through training epochs
             
@@ -758,19 +764,24 @@ def train_S2S(model, optimizer, loss_fn, trainloader,valloader,scheduler, num_ep
                 print('Epoch %d : train RMSE  %.4f, val RMSE %.4f ' % (epoch, t_rmse, v_rmse), file=f)
                 print('Epoch %d : train RMSE  %.4f, val RMSE %.4f ' % (epoch, t_rmse, v_rmse))
                 
-            ## Learning rate scheduler step
-            scheduler.step(v_rmse)
-
-            ## early stopping check to avoid overfitting
-            early_stopping(v_rmse, model,optimizer,tuning)
-
+            ## If in tuning mode, save checkpoint for model and optimizer state, and register checkpoint with train.report.
             if tuning:
+                torch.save((model.state_dict(), optimizer.state_dict()),os.path.join(tuningmod_savepath,model_name,'checkpoint.pt'))
                 checkpoint = Checkpoint.from_directory(os.path.join(tuningmod_savepath,model_name))
                 train.report({"val_loss": v_rmse, "train_loss": t_rmse}, checkpoint=checkpoint)
 
-            if early_stopping.early_stop:
-                print('Early stopping')
-                break
+            else:
+                ## Learning rate scheduler step
+                scheduler.step(v_rmse)
+
+                ## early stopping check to avoid overfitting
+                early_stopping(v_rmse, model,optimizer,tuning)
+
+                if early_stopping.early_stop:
+                    print('Early stopping')
+                    break
+                
+    print('Finished training')
 
 ########################################### MAIN ###########################################
 

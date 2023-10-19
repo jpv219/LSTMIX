@@ -18,7 +18,6 @@ import torch.nn as nn
 #trainedmod_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/trained_models/'
 
 trainedmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/trained_models/'
-tuningmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/tuning/'
 
 ##################################### CLASSES #################################################
 
@@ -64,7 +63,7 @@ class EarlyStopping:
         self.early_stop = False
         self.name = model_name
 
-    def __call__(self, val_loss, model,optimizer,tuning=False):
+    def __call__(self, val_loss, model):
         """
         Args:
             val_loss (float): Validation loss to be monitored for improvement.
@@ -74,7 +73,7 @@ class EarlyStopping:
 
         if self.best_score is None:
             self.best_score = score
-            self.save_checkpoint(val_loss, model,optimizer,tuning)
+            self.save_checkpoint(val_loss, model)
         elif score < self.best_score + self.delta:
             self.counter += 1
             if self.verbose:
@@ -83,10 +82,10 @@ class EarlyStopping:
                 self.early_stop = True
         else:
             self.best_score = score
-            self.save_checkpoint(val_loss, model,optimizer,tuning)
+            self.save_checkpoint(val_loss, model)
             self.counter = 0
 
-    def save_checkpoint(self, val_loss, model,optimizer,tuning):
+    def save_checkpoint(self, val_loss, model):
         """
         Saves model when validation loss decreases.
         """
@@ -94,7 +93,3 @@ class EarlyStopping:
             print(f'Validation loss decreased ({self.best_score:.6f} --> {val_loss:.6f}). Saving model...')
         # Save the model's state_dict.
         torch.save(model.state_dict(), os.path.join(trainedmod_savepath,f'{self.name}_trained_model.pt'))
-
-        if tuning:
-            torch.save((model.state_dict(), optimizer.state_dict()), 
-                       os.path.join(tuningmod_savepath,self.name,f'{self.name}_chkpnt.pt'))
