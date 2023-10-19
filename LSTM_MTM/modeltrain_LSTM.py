@@ -586,7 +586,7 @@ def train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler,
                 scheduler.step(v_rmse)
 
                 ## early stopping check to avoid overfitting
-                early_stopping(v_rmse, model,optimizer,tuning)
+                early_stopping(v_rmse, model)
 
                 if early_stopping.early_stop:
                     print('Early stopping')
@@ -775,7 +775,7 @@ def train_S2S(model, optimizer, loss_fn, trainloader,valloader,scheduler, num_ep
                 scheduler.step(v_rmse)
 
                 ## early stopping check to avoid overfitting
-                early_stopping(v_rmse, model,optimizer,tuning)
+                early_stopping(v_rmse, model)
 
                 if early_stopping.early_stop:
                     print('Early stopping')
