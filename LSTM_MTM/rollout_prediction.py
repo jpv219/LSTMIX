@@ -44,6 +44,18 @@ plt.rc('ytick', labelsize=BIGGER_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=MEDIUM_SIZE)    # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
+fine_labels = {
+    # svcases #
+    'Bi0001': r'$Bi=0.001$', 'Bi0002': r'$Bi=0.002$', 'Bi0004': r'$Bi=0.004$', 'Bi001': r'$Bi=0.01$', 'Bi1': r'$Bi=1$',
+    'B05': r'$Bi=0.1, \beta=0.5$','B07': r'$Bi=0.1, \beta=0.7$', 'B09': r'$Bi=0.1, \beta=0.9$',
+    'clean': r'Clean',
+    # smx cases #
+    'b03': r'$\beta=0.3$','b06':r'$\beta=0.6$','bi001':r'$Bi=0.01$','bi01':r'$Bi=0.1$','da01': r'$Da=0.1$','da1':r'$Da=1$',
+    'b06pm':r'$\beta_{pm}=0.6$,','b09pm':r'$\beta_{pm}=0.9$,','bi001pm':r'$Bi_{pm}=0.01$,',
+    'bi1':r'$Bi=1$','bi01pm':r'$Bi=0.1$,','3drop':r'3-Drop',
+    'b09':r'$\beta=0.9$','da01pm':r'$Da_{pm}=0.1$, ','da001':r'$Da=0.01$', 'coarsepm':r'Pre-Mix'
+}
+
 ####################################### ROLLOUT PREDICTION #####################################
 
 # Function to predict future values using rollout with the LSTM model
@@ -78,7 +90,7 @@ def rollout(model, input_seq, steps_out,total_steps):
 
 ####################################### PLOTTING FUN. #####################################
 
-def plot_model_pred(model,model_name,features,set_labels,set,
+def plot_model_pred(model,fine_lables, model_name,features,set_labels,set,
                     X_data,true_data,wind_size,casebatch_len):
 
     model.eval()
@@ -97,7 +109,11 @@ def plot_model_pred(model,model_name,features,set_labels,set,
         
         for seq, case in zip(range(num_cases), set_labels):
             # Target plots, true data from CFD
-            p = plt.plot(true_data[:, seq, f_idx], label=f'Target {str(case)}', color=colors[seq % len(colors)], linewidth = 3) # true_data has shape [times,cases,features]
+            plot_label = fine_labels.get(case,case)
+
+            p = plt.plot(true_data[:, seq, f_idx], 
+                         label=f'Target {plot_label}', color=colors[seq % len(colors)], 
+                         linewidth = 3) # true_data has shape [times,cases,features]
             ax = plt.gca()
             
             plt.setp(ax.spines.values(),linewidth = 1.5)
@@ -109,12 +125,12 @@ def plot_model_pred(model,model_name,features,set_labels,set,
                 plt.plot(range(wind_size-1,len(true_data)),
                         y_pred_data[:casebatch_len[seq],s_idx,f_idx],'s', markersize=5, 
                         markerfacecolor=p[0].get_color(),alpha=0.8, markeredgewidth=1.5, markeredgecolor='k',
-                        lw=0.0, label=f'Pred. {str(case)}')
+                        lw=0.0, label=f'Pred. {plot_label}')
             else:
                 plt.plot(range(wind_size-1,len(true_data)),
                         y_pred_data[casebatch_len[seq-1]:casebatch_len[seq],s_idx,f_idx],'s', markersize=5, 
                         markerfacecolor=p[0].get_color(),alpha=0.8, markeredgewidth=1.5, markeredgecolor='k',
-                        lw=0.0, label=f'Pred. {str(case)}')
+                        lw=0.0, label=f'Pred. {plot_label}')
                 
         plt.legend()
         plt.xlim(0, 110)
@@ -128,7 +144,7 @@ def plot_model_pred(model,model_name,features,set_labels,set,
         fig.savefig(os.path.join(fig_savepath, f'Pred_{model_name}_{features[f_idx]}_{set}_set.png'), dpi=150)
         plt.show()
 
-def plot_rollout_pred(rollout_seq, true_data, features,set_labels, model_name):
+def plot_rollout_pred(rollout_seq, true_data, features,set_labels, fine_labels, model_name):
 
     colors = sns.color_palette("hsv", len(set_labels))
 
@@ -138,13 +154,16 @@ def plot_rollout_pred(rollout_seq, true_data, features,set_labels, model_name):
         fig = plt.figure(figsize=(12,6))
 
         for i, case in enumerate(set_labels):
+
+            plot_label = fine_labels.get(case,case)
             ## truedata shaped as (timesteps, cases, features) and rollout as (case,timestep,features)
             r2 = r2_score(true_data[:,i,f_idx],rollout_seq[i,:,f_idx][:true_data.shape[0]])
 
-            p = plt.plot(true_data[:,i,f_idx], label=f'Target {case}, $R^2$:{r2:.4f}',color = colors[i % len(colors)],linewidth = 3)
+            p = plt.plot(true_data[:,i,f_idx], label=f'Target {plot_label}, $R^2$:{r2:.4f}',color = colors[i % len(colors)],linewidth = 3)
+
             plt.plot(rollout_seq[i,:,f_idx],'s',markersize=5,
                      markerfacecolor=p[0].get_color(),alpha=0.8,markeredgewidth=1.5, markeredgecolor='k',
-                     lw=0.0, label=f'{model_name} Pred. {case}')
+                     lw=0.0, label=f'{model_name} Pred. {plot_label}')
             ax = plt.gca()
 
             plt.setp(ax.spines.values(),linewidth = 1.5)
@@ -234,10 +253,10 @@ def main():
         train_casebatch = casebatches[0]
         val_casebatch = casebatches[1]
 
-        plot_model_pred(model, model_choice, features, splitset_labels[0],
+        plot_model_pred(model, fine_labels, model_choice, features, splitset_labels[0],
                         'Train',X_train, train_arr, wind_size, train_casebatch)
         
-        plot_model_pred(model, model_choice, features, splitset_labels[1],
+        plot_model_pred(model,fine_labels, model_choice, features, splitset_labels[1],
                 'Validation',X_val, val_arr, wind_size, val_casebatch)
     else:
         pass
@@ -254,7 +273,7 @@ def main():
     ## Calling rollout prediction for test data
     rollout_seq = rollout(model,input_seq,hyperparams["steps_out"],total_steps)
 
-    plot_rollout_pred(rollout_seq,test_arr, features,splitset_labels[2], model_choice)
+    plot_rollout_pred(rollout_seq,test_arr, features,splitset_labels[2],fine_labels, model_choice)
 
 if __name__ == "__main__":
     main()

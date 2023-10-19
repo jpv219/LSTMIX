@@ -60,6 +60,18 @@ plt.rc('ytick', labelsize=BIGGER_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=MEDIUM_SIZE)    # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
+fine_labels = {
+    # svcases #
+    'Bi0001': r'$Bi=0.001$', 'Bi0002': r'$Bi=0.002$', 'Bi0004': r'$Bi=0.004$', 'Bi001': r'$Bi=0.01$', 'Bi1': r'$Bi=1$',
+    'B05': r'$Bi=0.1, \beta=0.5$','B07': r'$Bi=0.1, \beta=0.7$', 'B09': r'$Bi=0.1, \beta=0.9$',
+    'clean': r'Clean',
+    # smx cases #
+    'b03': r'$\beta=0.3$','b06':r'$\beta=0.6$','bi001':r'$Bi=0.01$','bi01':r'$Bi=0.1$','da01': r'$Da=0.1$','da1':r'$Da=1$',
+    'b06pm':r'$\beta_{pm}=0.6$,','b09pm':r'$\beta_{pm}=0.9$,','bi001pm':r'$Bi_{pm}=0.01$,',
+    'bi1':r'$Bi=1$','bi01pm':r'$Bi=0.1$,','3drop':r'3-Drop',
+    'b09':r'$\beta=0.9$','da01pm':r'$Da_{pm}=0.1$, ','da001':r'$Da=0.01$', 'coarsepm':r'Pre-Mix'
+}
+
 ##################################### CLASSES #################################################
 
 class Window_data():
@@ -86,7 +98,7 @@ class Window_data():
         return train, val, test, (train_cases, val_cases, test_cases)
 
     ## plot split data sets   
-    def plot_split_cases(self, data, splitset_labels, train, val, test, 
+    def plot_split_cases(self, data, fine_labels, splitset_labels, train, val, test, 
                         features, case_labels, dpi=150):
 
         #Plot setup
@@ -117,7 +129,9 @@ class Window_data():
             for i in range(data.shape[-1]):
 
                 for case, idx in zip(case_labels, range(len(case_labels))):
-                    ax[i].plot(split_set[:,idx,i],label = f'{str(case)}',color=color_palette[idx % len(color_palette)])
+
+                    plot_label = fine_labels.get(case,case)
+                    ax[i].plot(split_set[:,idx,i],label = f'{plot_label}',color=color_palette[idx % len(color_palette)])
                     ax[i].set_title(f'{label}: {features[i]}')
                     ax[i].set_xlabel('Time steps')
                     ax[i].set_ylabel(f'Scaled {features[i]}')
@@ -382,7 +396,7 @@ def windowing(steps_in,steps_out,stride):
     ## plotting split data
     plot_choice = input('plot split data sets? (y/n) :')
     if plot_choice.lower() == 'y' or plot_choice.lower() == 'yes':
-        windowing.plot_split_cases(input_df, splitset_labels, train_arr, val_arr, test_arr, 
+        windowing.plot_split_cases(input_df, fine_labels, splitset_labels, train_arr, val_arr, test_arr, 
                             features,Allcases)
     else:
         pass
@@ -635,7 +649,7 @@ def train_S2S(model, optimizer, loss_fn, trainloader,valloader,scheduler, num_ep
                         optimizer.load_state_dict(loaded_checkpoint_state['optimizer_state_dict'])
         else:
             ### Early stopping feature to avoid overfitting during training, monitoring a minimum improvement threshold
-            early_stopping = EarlyStopping(model_name,patience=5, verbose=True)
+            early_stopping = EarlyStopping(model_name,patience=10, verbose=True)
 
         for epoch in range(num_epochs): #looping through training epochs
             
@@ -819,7 +833,7 @@ def main():
     hidden_size = 128  # Number of hidden units in the LSTM cell, determines how many weights will be used in the hidden state calculations
     output_size = y_train.shape[-1]  # Number of output features, same as input in this case
     pred_steps = steps_out # Number of future steps to predict
-    batch_size = 20 # How many windows are being processed per pass through the LSTM
+    batch_size = 25 # How many windows are being processed per pass through the LSTM
     learning_rate = 0.005
     num_epochs = 3000
     check_epochs = 100
