@@ -1,5 +1,5 @@
 ### LSTM windowing and model training
-### Author: Juan Pablo Valdes
+### Authors: Juan Pablo Valdes and Fuyue Liang
 ### Code adapted from Fuyue Liang LSTM for stirred vessels
 ### First commit: Oct, 2023
 ### Department of Chemical Engineering, Imperial College London
