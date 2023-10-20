@@ -15,6 +15,7 @@ from scipy.signal import savgol_filter
 from statsmodels.nonparametric.smoothers_lowess import lowess
 import os
 import pickle
+import ast
 
 ## Env. variables ##
 
@@ -45,6 +46,18 @@ plt.rc('ytick', labelsize=BIGGER_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=MEDIUM_SIZE)    # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
+fine_labels = {
+    # svcases #
+    'Bi0001': r'$Bi=0.001$', 'Bi0002': r'$Bi=0.002$', 'Bi0004': r'$Bi=0.004$', 'Bi001': r'$Bi=0.01$', 'Bi1': r'$Bi=1$',
+    'B05': r'$Bi=0.1, \beta=0.5$','B07': r'$Bi=0.1, \beta=0.7$', 'B09': r'$Bi=0.1, \beta=0.9$',
+    'clean': r'Clean',
+    # smx cases #
+    'b03': r'$\beta=0.3$','b06':r'$\beta=0.6$','bi001':r'$Bi=0.01$','bi01':r'$Bi=0.1$','da01': r'$Da=0.1$','da1':r'$Da=1$',
+    'b06pm':r'$\beta_{pm}=0.6$,','b09pm':r'$\beta_{pm}=0.9$,','bi001pm':r'$Bi_{pm}=0.01$,',
+    'bi1':r'$Bi=1$','bi01pm':r'$Bi=0.1$,','3drop':r'3-Drop',
+    'b09':r'$\beta=0.9$','da01pm':r'$Da_{pm}=0.1$, ','da001':r'$Da=0.01$', 'coarsepm':r'coarse pm'
+}
+
 ##### METHODS #####
 
 def import_rawdata(case):
@@ -61,6 +74,35 @@ def import_rawdata(case):
 
     return df_Vol, Nd, IntA
 
+def import_svrawdata(case, initial=320, stop=704, opt=0.00625):
+    '''
+    return a dataframe with columns ['Time', 'DropVolume', 'Gammatilde', 'DropNum', 'IntArea']
+    '''
+    
+    data_dir = '/home/fl18/Desktop/automatework/RNN_auto/APSdata/'
+    df = pd.read_csv(str(data_dir)+str(case)+'.csv')
+    
+    # surfactant-laden cases to count the drop numbers from list drop volume
+    if not case == 'clean':
+        df['DropVolume'] = df['DropVolume'].str.replace(' ',', ')
+        df['Gammatilde'] = df['Gammatilde'].apply(lambda x: ', '.join(x.split())) # standardize the separator
+        df['DropVolume'] = df['DropVolume'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
+        df['Gammatilde'] = df['Gammatilde'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
+        df['DropNum'] = df['DropVolume'].apply(lambda x: len(x))
+    
+    else:
+        df['DropVolume'] = df['DropVolume'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
+        df['DropNum'] = df['DropVolume'].apply(lambda x: len(x))
+    
+    # Truncation of data
+    truned_df = df.loc[(df['Time']/opt >= initial) & (df['Time']/opt <= stop)]
+    
+    # merge the data of interfacial area
+    ints_df = pd.read_csv(str(data_dir)+'IntArea_'+str(case)+'.csv')
+    data = pd.merge(truned_df, ints_df, on='Time', how='left')
+    
+    return data
+
 ## group input data into case-wise dictionary
 
 def sort_inputdata(cases):
@@ -72,18 +114,23 @@ def sort_inputdata(cases):
     # Loop through all cases
     for case in cases:
         # Extract raw data
-        df_Vol, Nd, IntA = import_rawdata(case)
+        # df_Vol, Nd, IntA = import_rawdata(case)
         
-        time = Nd['Time']
-        n_drops = Nd['Ndrops']
-        IA = IntA['IA']
-        DSD = df_Vol['Volume']
+        # time = Nd['Time']
+        # n_drops = Nd['Ndrops']
+        # IA = IntA['IA']
+        # DSD = df_Vol['Volume']
+        data = import_svrawdata(case)
+        time = data['Time']
+        n_drops = data['DropNum']
+        IA = data['IntArea']
+        DSD = data['DropVolume']
         
         # Determine if case needs surf. conc. or clean
-        if case == '3drop' or case == 'coarsepm':
+        if case == '3drop' or case == 'coarsepm' or case == 'clean':
             G = []  # If true, set G as an empty list
         else:
-            G = df_Vol['Gammatilde']  # If false, extract G data
+            G = data['Gammatilde']  # If false, extract G data
         
         ## Dictionary holding a dictionary per case for all extracted data from paraview
         pre_dict[case] = {'Time': time, 'Nd': n_drops, 'IA': IA, 'Vol': DSD, 'G': G}
@@ -185,11 +232,11 @@ def smoothing(data, method, window_size=None, poly_order=None, lowess_frac = Non
 
 #### PLOTS ####
 
-def plot_inputdata(cases,data,dpi=150):
+def plot_inputdata(cases,fine_labels, data,dpi=150):
     ### looping over the number of features (Nd and IA)
 
     features = ['Number of drops', 'Interfacial Area']
-    colors = sns.color_palette("husl", len(cases))
+    colors = sns.color_palette('muted', len(cases))
 
     # Create a single figure with multiple subplots
     fig, axes = plt.subplots(1,2, figsize=(12, 8), dpi=dpi, num=1)
@@ -203,7 +250,8 @@ def plot_inputdata(cases,data,dpi=150):
             spine.set_linewidth(1.5)
 
         for idx, case in enumerate(cases):
-            ax.plot(data[:, idx, i], label=f'{str(case)}', color=colors[idx % len(colors)])
+            plot_label = fine_labels.get(case,case)
+            ax.plot(data[:, idx, i], label=f'{plot_label}', color=colors[idx % len(colors)])
             ax.tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', length=5, width=1.5)
             ax.grid(color='k', linestyle=':', linewidth=0.1)
 
@@ -214,10 +262,11 @@ def plot_inputdata(cases,data,dpi=150):
     plt.savefig(os.path.join(fig_savepath,'input_data'),dpi=dpi)
     plt.show()
 
-def plot_smoothdata(data, smoothed_data, method, cases,dpi=150):
+def plot_smoothdata(data, fine_labels, smoothed_data, method, cases,dpi=150):
     
     fig, ax = plt.subplots(1,2, figsize=(12,8), dpi=dpi, num=2)
-    colors = sns.color_palette("husl", len(cases))
+    colors = sns.color_palette('muted', len(cases))
+    marker_list = ['o','>','s','^','d','<','X','v','p','P','*']
     features = ['Number of drops', 'Interfacial Area']
 
     for feature in range(len(features)):
@@ -239,7 +288,7 @@ def plot_smoothdata(data, smoothed_data, method, cases,dpi=150):
     
     fig.suptitle(f'Smoothing method: {method}', fontsize=18)
 
-    ax[1].legend(labels=[f'{str(case)}' for case in cases])
+    ax[1].legend(labels=[f'{fine_labels.get(case,case)}' for case in cases])
 
     for ax in ax:
         for spine in ax.spines.values():
@@ -257,7 +306,7 @@ def main():
     # 'bi1','bi01pm','3drop',
     # 'b09','da01pm','da001', 'coarsepm']
 
-    svcases = ['Bi0001','Bi0002','Bi0004','Bi001','B05', 'B07', 'B09', 'Bi1','clean']
+    svcases = ['Bi0001','Bi0002','Bi0004','Bi001','B07','clean','B09','B05','Bi1']
 
     # List of columns to be normalized
     norm_columns = ['Nd', 'IA']
@@ -269,12 +318,12 @@ def main():
     shaped_input = shape_inputdata(post_dict)
 
     #plotting
-    plot_inputdata(svcases,shaped_input)
+    plot_inputdata(svcases,fine_labels,shaped_input)
 
     # smoothing data
-    smoothed_data = smoothing(shaped_input,'savgol',window_size=5,poly_order=3)
+    smoothed_data = smoothing(shaped_input,'lowess',lowess_frac=0.03)
 
-    plot_smoothdata(shaped_input, smoothed_data, 'savgol', svcases)
+    plot_smoothdata(shaped_input,fine_labels,smoothed_data,'lowess',svcases)
 
     ## saving input data 
 

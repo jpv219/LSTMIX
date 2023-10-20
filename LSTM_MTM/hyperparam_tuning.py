@@ -33,7 +33,7 @@ from ray.tune.schedulers import ASHAScheduler
 fig_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/figs/'
 input_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/input_data/'
 trainedmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/trained_models/'
-tuningmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/tuning/'
+tuningmod_savepath = '/media/fl18/Elements/Hypertuning/'
 
 ########################################### METHODS ###########################################
 
@@ -117,12 +117,12 @@ def load_data(model_choice):
 
             # X_tensors
             in_savetens = torch.load(in_ptfile)
-            windowed_in_tens.append(in_savetens["windowed_data"])
+            windowed_in_tens.append(in_savetens["windowed_data"].to(torch.float32))
             in_casebatch.append(in_savetens[f"{setlbl}_casebatch"])
 
             # y_tensors
             out_savetens = torch.load(out_ptfile)
-            windowed_out_tens.append(out_savetens["windowed_data"])
+            windowed_out_tens.append(out_savetens["windowed_data"].to(torch.float32))
             out_casebatch.append(out_savetens[f"{setlbl}_casebatch"])
     
     return windowed_in_tens, windowed_out_tens, in_casebatch, out_casebatch, test_array, testset_labels
@@ -159,16 +159,16 @@ def main():
     init = {
         "input_size": X_tens[0].shape[-1],
         "output_size": y_tens[0].shape[-1],
-        "pred_steps": 15,
-        "num_epochs": 50,
-        "check_epochs": 10
+        "pred_steps": 50,
+        "num_epochs": 100,
+        "check_epochs": 20
     }
 
     scheduler = ASHAScheduler(
     metric='val_loss',
     mode='min',
     max_t= init["num_epochs"],
-    grace_period=20, # save period without early stopping
+    grace_period=40, # save period without early stopping
     reduction_factor=2,
     )
 
@@ -179,7 +179,7 @@ def main():
     partial(train_tune,model_choice=model_choice,
             init=init,X_tens=X_tens,y_tens=y_tens),
     config = search_space,
-    num_samples = 5, # number of hyperparameter configuration to try
+    num_samples = 250, # number of hyperparameter configuration to try
     scheduler=scheduler,
     local_dir = os.path.join(tuningmod_savepath,model_choice)
 )

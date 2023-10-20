@@ -40,7 +40,7 @@ import ray.cloudpickle as raypickle
 fig_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/figs/'
 input_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/input_data/'
 trainedmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/trained_models/'
-tuningmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/tuning/'
+tuningmod_savepath = '/media/fl18/Elements/Hypertuning/'
 
 ## Plot setup
 
@@ -59,6 +59,18 @@ plt.rc('xtick', labelsize=BIGGER_SIZE)    # fontsize of the tick labels
 plt.rc('ytick', labelsize=BIGGER_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=MEDIUM_SIZE)    # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+
+fine_labels = {
+    # svcases #
+    'Bi0001': r'$Bi=0.001$', 'Bi0002': r'$Bi=0.002$', 'Bi0004': r'$Bi=0.004$', 'Bi001': r'$Bi=0.01$', 'Bi1': r'$Bi=1$',
+    'B05': r'$Bi=0.1, \beta=0.5$','B07': r'$Bi=0.1, \beta=0.7$', 'B09': r'$Bi=0.1, \beta=0.9$',
+    'clean': r'Clean',
+    # smx cases #
+    'b03': r'$\beta=0.3$','b06':r'$\beta=0.6$','bi001':r'$Bi=0.01$','bi01':r'$Bi=0.1$','da01': r'$Da=0.1$','da1':r'$Da=1$',
+    'b06pm':r'$\beta_{pm}=0.6$,','b09pm':r'$\beta_{pm}=0.9$,','bi001pm':r'$Bi_{pm}=0.01$,',
+    'bi1':r'$Bi=1$','bi01pm':r'$Bi=0.1$,','3drop':r'3-Drop',
+    'b09':r'$\beta=0.9$','da01pm':r'$Da_{pm}=0.1$, ','da001':r'$Da=0.01$', 'coarsepm':r'coarse pm'
+}
 
 ##################################### CLASSES #################################################
 
@@ -86,7 +98,7 @@ class Window_data():
         return train, val, test, (train_cases, val_cases, test_cases)
 
     ## plot split data sets   
-    def plot_split_cases(self, data, splitset_labels, train, val, test, 
+    def plot_split_cases(self, data, fine_labels, splitset_labels, train, val, test, 
                         features, case_labels, dpi=150):
 
         #Plot setup
@@ -117,7 +129,8 @@ class Window_data():
             for i in range(data.shape[-1]):
 
                 for case, idx in zip(case_labels, range(len(case_labels))):
-                    ax[i].plot(split_set[:,idx,i],label = f'{str(case)}',color=color_palette[idx % len(color_palette)])
+                    plot_label = fine_labels.get(case,case)
+                    ax[i].plot(split_set[:,idx,i],label = f'{plot_label}',color=color_palette[idx % len(color_palette)])
                     ax[i].set_title(f'{label}: {features[i]}')
                     ax[i].set_xlabel('Time steps')
                     ax[i].set_ylabel(f'Scaled {features[i]}')
@@ -244,7 +257,7 @@ class LSTM_encoder(nn.Module):
         input shape: (batch_size, input steps/input window, input_size=num_features)
         output shape: (input_size=num_features, hidden_size)
         '''
-        _, (h_n_encoder,c_n_encoder) = self.lstm(encoder_input) #ignoring output (hidden states) for all times and only saving a tuple with the last timestep cell and hidden state
+        _, (h_n_encoder,c_n_encoder) = self.lstm(encoder_input) # ignoring output (hidden states) for all times and only saving a tuple with the last timestep cell and hidden state
         
         return (h_n_encoder,c_n_encoder)
 
@@ -362,28 +375,30 @@ def windowing(steps_in,steps_out,stride):
     'train_arr', 'val_arr', 'test_arr', 'splitset_labels'
     ])
 
-    Allcases = ['b03','b06','bi001','bi01','da01','da1','b06pm','b09pm','bi001pm',
-    'bi1','bi01pm','3drop',
-    'b09','da01pm','da001', 'coarsepm']
+    # Allcases = ['b03','b06','bi001','bi01','da01','da1','b06pm','b09pm','bi001pm',
+    # 'bi1','bi01pm','3drop',
+    # 'b09','da01pm','da001', 'coarsepm']
+
+    svcases = ['Bi0001','Bi0002','Bi0004','Bi001','B07','clean','B09','B05','Bi1']
 
     features = ['Number of drops', 'Interfacial Area']
 
     # Reading saved re-shaped input data from file
-    with open(os.path.join(input_savepath,'inputdata.pkl'), 'rb') as file:
+    with open(os.path.join(input_savepath,'svinputdata.pkl'), 'rb') as file:
         input_df = pickle.load(file)
     
     ## data splitting for training, validating and testing
-    train_frac = 0.5625
-    test_frac = 0.25
+    train_frac = 0.7
+    test_frac = 0.15
 
     train_arr, val_arr, test_arr, splitset_labels = windowing.split_cases(
-        input_df, train_frac, test_frac, Allcases)
+        input_df, train_frac, test_frac, svcases)
     
     ## plotting split data
     plot_choice = input('plot split data sets? (y/n) :')
     if plot_choice.lower() == 'y' or plot_choice.lower() == 'yes':
-        windowing.plot_split_cases(input_df, splitset_labels, train_arr, val_arr, test_arr, 
-                            features,Allcases)
+        windowing.plot_split_cases(input_df, fine_labels, splitset_labels, train_arr, val_arr, test_arr, 
+                            features,svcases)
     else:
         pass
 
@@ -801,16 +816,16 @@ def main():
     ####### WINDOW DATA ########
 
     ## Windowing hyperparameters
-    steps_in, steps_out = 30, 15
+    steps_in, steps_out = 50, 50
     stride = 1
 
     windowed_data = windowing(steps_in,steps_out,stride)
 
     ## Extracting from named tuple
-    X_train = windowed_data.X_train
-    y_train = windowed_data.y_train
-    X_val = windowed_data.X_val
-    y_val = windowed_data.y_val
+    X_train = windowed_data.X_train.to(torch.float32)
+    y_train = windowed_data.y_train.to(torch.float32)
+    X_val = windowed_data.X_val.to(torch.float32)
+    y_val = windowed_data.y_val.to(torch.float32)
 
     ######### LSTM MODEL TRAINING ##########
 
@@ -819,12 +834,12 @@ def main():
     hidden_size = 128  # Number of hidden units in the LSTM cell, determines how many weights will be used in the hidden state calculations
     output_size = y_train.shape[-1]  # Number of output features, same as input in this case
     pred_steps = steps_out # Number of future steps to predict
-    batch_size = 20 # How many windows are being processed per pass through the LSTM
+    batch_size = 30 # How many windows are being processed per pass through the LSTM
     learning_rate = 0.005
-    num_epochs = 3000
+    num_epochs = 2000
     check_epochs = 100
 
-    tf_ratio = 0.15
+    tf_ratio = 0.1
     dynamic_tf = True
 
     # customize loss function 
