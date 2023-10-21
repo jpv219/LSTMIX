@@ -509,7 +509,7 @@ def train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler,
 
         else:
             ### Early stopping feature to avoid overfitting during training, monitoring a minimum improvement threshold
-            early_stopping = EarlyStopping(model_name,patience=5, verbose=True)
+            early_stopping = EarlyStopping(model_name,patience=10, verbose=True)
 
         for epoch in range(num_epochs): #looping through epochs
             model.train() #set the model to train mode -- informing features to behave accordingly for training

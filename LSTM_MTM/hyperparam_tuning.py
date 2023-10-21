@@ -19,6 +19,7 @@ import shutil
 import os
 from functools import partial
 import sys
+from contextlib import redirect_stdout
 
 import ray
 from ray import tune
@@ -146,9 +147,9 @@ def load_data(model_choice):
 
 def run_tuning(config, model_choice, init, X_tens, y_tens, scheduler, 
                num_samples, log_file_path, best_chkpt_path, tuning):
-    with open(log_file_path, 'w') as f:
-        original_stdout = sys.stdout  # Store the original stdout
-        sys.stdout = f  # Redirect stdout to the log file
+    
+    with open(log_file_path, 'w',encoding='utf-8', errors='ignore') as f, redirect_stdout(f):
+
         try:
             tuner = tune.run(
                 partial(train_tune,
@@ -165,24 +166,37 @@ def run_tuning(config, model_choice, init, X_tens, y_tens, scheduler,
             )
 
             return tuner
+        
         finally:
-            sys.stdout = original_stdout  # Restore the original stdout
+            sys.stdout.flush()
 
 
-def further_train(model_choice, X_tens, y_tens, best_trial,best_chkpt):
+def further_train(model_choice, init_training, X_tens, y_tens, best_trial,best_chkpt):
     
-    ## Setting new init and config parameters for further training of best trial tuned
-    init_training = {
-        "input_size": X_tens[0].shape[-1],
-        "output_size": y_tens[0].shape[-1],
-        "pred_steps": 15,
-        "num_epochs": 3000,
-        "check_epochs": 100
-    }
-
     config_training = best_trial.config
 
     best_chkpt_path = best_chkpt.path
+    
+    ## save hyperparameters used forfurther  model trained for later plotting and rollout prediction
+    hyperparams = {
+        "input_size": init_training['input_size'],
+        "hidden_size": config_training['hidden_size'],
+        "output_size": init_training['output_size'],
+        "pred_steps": init_training['pred_steps'],
+        "batch_size": config_training['batch_size'],
+        "learning_rate": config_training['learning_rate'],
+        "num_epochs": init_training['num_epochs'],
+        "check_epochs": init_training['check_epochs'],
+        "steps_in": init_training['steps_in'],
+        "steps_out": init_training['steps_out'],
+        "tf_ratio": config_training['tf_ratio'],
+        "dynamic_tf": config_training['dynamic_tf']
+    }
+
+    with open(os.path.join(trainedmod_savepath,f'hyperparams_{model_choice}.txt'), "w") as file:
+
+        for key, value in hyperparams.items():
+            file.write(f"{key}: {value}\n")
 
     ## Set to train further mode
     train_tune(config_training, model_choice, init_training, X_tens, y_tens, best_chkpt_path, tuning=False)
@@ -255,25 +269,33 @@ def main():
 
     if train_further.lower() == 'y':
     
-        further_train(model_choice,X_tens,y_tens,best_trial,best_chkpoint)
-
-    else:
+        ## Setting new init and config parameters for further training of best trial tuned
+        init_training = {
+            "input_size": X_tens[0].shape[-1],
+            "output_size": y_tens[0].shape[-1],
+            "pred_steps": 15,
+            "num_epochs": 3000,
+            "check_epochs": 100,
+            "steps_in": 30,
+            "steps_out": 15
+    }
         
-        print(f'Finished tuning hyperparameters with {num_samples} samples')
-        print(f'Best trial id: {best_trial.trial_id}')
-        print(f'Best trial config: {best_trial.config}')
+        further_train(model_choice,init_training,X_tens,y_tens,best_trial,best_chkpoint)
 
-        # Saving best model and config to external path
-        best_model_path = os.path.join(tuningmod_savepath,f'best_models/{model_choice}')
+    print(f'Finished tuning hyperparameters with {num_samples} samples')
+    print(f'Best trial id: {best_trial.trial_id}')
+    print(f'Best trial config: {best_trial.config}')
 
-        shutil.copy(f'{best_chkpoint.path}/chk_dict.pkl',best_model_path)
+    # Saving best model and config to external path
+    best_model_path = os.path.join(tuningmod_savepath,f'best_models/{model_choice}')
 
-        with open(f'{best_model_path}/config_{model_choice}.pkl', 'wb') as pickle_file:
+    shutil.copy(f'{best_chkpoint.path}/chk_dict.pkl',best_model_path)
 
-            pickle.dump(best_trial.config, pickle_file)
+    with open(f'{best_model_path}/config_{model_choice}.pkl', 'wb') as pickle_file:
 
+        pickle.dump(best_trial.config, pickle_file)
 
-        print('Model state and config settings copied to best_model folder')
+    print('Model state and config settings copied to best_model folder')
 
 
 if __name__ == "__main__":
