@@ -34,7 +34,7 @@ plt.rcParams.update({
     "font.family": "serif",
     "font.serif": ['Computer Modern']})
 
-SMALL_SIZE = 8
+SMALL_SIZE = 6
 MEDIUM_SIZE = 12
 BIGGER_SIZE = 18
 plt.rc('font', size=BIGGER_SIZE)          # controls default text sizes
@@ -42,7 +42,7 @@ plt.rc('axes', titlesize=BIGGER_SIZE)     # fontsize of the axes title
 plt.rc('axes', labelsize=BIGGER_SIZE)    # fontsize of the x and y labels
 plt.rc('xtick', labelsize=BIGGER_SIZE)    # fontsize of the tick labels
 plt.rc('ytick', labelsize=BIGGER_SIZE)    # fontsize of the tick labels
-plt.rc('legend', fontsize=MEDIUM_SIZE)    # legend fontsize
+plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 fine_labels = {
@@ -228,7 +228,7 @@ def plot_inputdata(cases, fine_labels, data,dpi=150):
             ax.grid(color='k', linestyle=':', linewidth=0.1)
 
     fig.suptitle(f'Input data: {features}', fontsize=18)
-    axes[0].legend()
+    axes[0].legend(loc='upper left', bbox_to_anchor=(0.0, 1.0), ncol=2,fontsize='xx-small')
 
     plt.tight_layout()
     plt.savefig(os.path.join(fig_savepath,'input_data'),dpi=dpi)
@@ -247,19 +247,22 @@ def plot_smoothdata(data, smoothed_data, fine_labels, method, cases,dpi=150):
             ax[0].set_title('Data before')
             ax[0].set_xlabel('Time steps')
             ax[0].set_ylabel('Scaled data')
-            ax[0].tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', length=5, width=1.5)
+            ax[0].tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', 
+                              length=5, width=1.5)
             ax[0].grid(color='k', linestyle=':', linewidth=0.1)
             
             ax[1].plot(smoothed_data[:,idx,feature],color=colors[idx % len(colors)])
             ax[1].set_title('Data after')
             ax[1].set_xlabel('Time steps')
             ax[1].set_ylabel('Smoothed data')
-            ax[1].tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', length=5, width=1.5)
+            ax[1].tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', 
+                              length=5, width=1.5)
             ax[1].grid(color='k', linestyle=':', linewidth=0.1)
     
     fig.suptitle(f'Smoothing method: {method}', fontsize=18)
 
-    ax[1].legend(labels=[f'{fine_labels.get(case,case)}' for case in cases])
+    ax[0].legend(labels=[f'{fine_labels.get(case,case)}' for case in cases],
+                 loc='upper left', bbox_to_anchor=(0.0, 1.0), ncol=2,fontsize='xx-small')
 
     for ax in ax:
         for spine in ax.spines.values():

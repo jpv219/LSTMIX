@@ -366,7 +366,7 @@ class LSTM_S2S(nn.Module):
 
 ##################################### INPUT_DATA FUN. ################################################
 
-def input_data(Allcases, features,smoothing_method):
+def input_data(Allcases, features,smoothing_method,smoothing_params):
  
     # scaled input data 
     post_dict = ipt.scale_inputs(Allcases,features)
@@ -378,7 +378,12 @@ def input_data(Allcases, features,smoothing_method):
     ipt.plot_inputdata(Allcases,fine_labels,shaped_input)
 
     # smoothing data
-    smoothed_data = ipt.smoothing(shaped_input,smoothing_method,window_size=5,poly_order=3,lowess_frac=None)
+
+    window_size = smoothing_params[0]
+    poly_order = smoothing_params[1]
+    lowess_frac = smoothing_params[2]
+
+    smoothed_data = ipt.smoothing(shaped_input,smoothing_method,window_size,poly_order,lowess_frac)
 
     ipt.plot_smoothdata(shaped_input, smoothed_data,fine_labels, smoothing_method, Allcases)
 
@@ -843,13 +848,19 @@ def main():
 
     features = ['Number of drops', 'Interfacial Area']
 
+    ## Smoothing parameters
     smoothing_method = 'savgol'
+    window_size = 5 # needed for moveavg and savgol
+    poly_order = 3 # needed for savgol
+    lowess_frac = 0.03 #needed for lowess
+
+    smoothing_params = (window_size,poly_order,lowess_frac)
 
     ## Re process raw data to swap cases between train, validation and test split sets. Order will depend on Allcases list and train/test fracs.
     choice = input('Re-process raw data sets before windowing? (y/n) : ')
 
     if choice.lower() == 'y':
-        input_data(Allcases,features,smoothing_method)
+        input_data(Allcases,features,smoothing_method,smoothing_params)
 
     ## data splitting for training, validating and testing
     train_frac = 9/16

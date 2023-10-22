@@ -27,13 +27,19 @@ def main():
 
     features = ['Number of drops', 'Interfacial Area']
 
+    ## Smoothing parameters
     smoothing_method = 'savgol'
+    window_size = 5 # needed for moveavg and savgol
+    poly_order = 3 # needed for savgol
+    lowess_frac = 0.03 #needed for lowess
+
+    smoothing_params = (window_size,poly_order,lowess_frac)
 
     ## Re process raw data to swap cases between train, validation and test split sets. Order will depend on Allcases list and train/test fracs.
     choice = input('Re-process raw data sets before windowing? (y/n) : ')
 
     if choice.lower() == 'y':
-        trn.input_data(Allcases,features,smoothing_method)
+        trn.input_data(Allcases,features,smoothing_method,smoothing_params)
 
     ## data splitting for training, validating and testing
     train_frac = 9/16
