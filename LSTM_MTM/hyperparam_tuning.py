@@ -15,12 +15,16 @@ import torch.optim as optim
 import torch.utils.data as data
 import pickle
 import psutil
+import shutil
 import os
 from functools import partial
+import sys
+from contextlib import redirect_stdout
 
 import ray
 from ray import tune
 from ray.tune.schedulers import ASHAScheduler
+import ray.cloudpickle as raypickle
 
 
 ## Env. variables ##
@@ -32,12 +36,12 @@ from ray.tune.schedulers import ASHAScheduler
 
 fig_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/figs/'
 input_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/input_data/'
-trainedmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/trained_models/'
+trainedmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/trained_svmodels/'
 tuningmod_savepath = '/media/fl18/Elements/Hypertuning/'
 
 ########################################### METHODS ###########################################
 
-def train_tune(config, model_choice, init, X_tens, y_tens):
+def train_tune(config, model_choice, init, X_tens, y_tens, best_chkpt_path, tuning):
     '''
     init: Initialization (non-tunable) parameters for LSTM class
     config: receives the hyperparameters we would like to train with;
@@ -49,8 +53,7 @@ def train_tune(config, model_choice, init, X_tens, y_tens):
                                   shuffle=True, batch_size=config['batch_size'])
     valloader = data.DataLoader(data.TensorDataset(X_tens[1], y_tens[1]), 
                                 shuffle=True, batch_size=config['batch_size'])
-
-
+    
     ## Calling model class instance and training function
     if model_choice == "DMS":
 
@@ -61,10 +64,17 @@ def train_tune(config, model_choice, init, X_tens, y_tens):
         optimizer = optim.Adam(model.parameters(), lr = config["learning_rate"])
         scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=True)
 
+        if not tuning:
+            with open(os.path.join(best_chkpt_path, 'chk_dict.pkl'),'rb') as fp:
+                loaded_checkpoint_state = raypickle.load(fp)
+                
+                model.load_state_dict(loaded_checkpoint_state['model_state_dict'])
+                optimizer.load_state_dict(loaded_checkpoint_state['optimizer_state_dict'])
+
         ## Calling training function
         trn.train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler, 
             init["num_epochs"], init["check_epochs"], X_tens[0], y_tens[0], X_tens[1], 
-            y_tens[1],saveas='DMS_out',batch_loss=config["batch_loss"],tuning=True)
+            y_tens[1],saveas='DMS_out',batch_loss=config["batch_loss"],tuning=tuning)
         
 
     elif model_choice == 'S2S':
@@ -75,11 +85,18 @@ def train_tune(config, model_choice, init, X_tens, y_tens):
         
         optimizer = optim.Adam(model.parameters(), lr = config["learning_rate"])
         scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=True)
+
+        if not tuning:
+            with open(os.path.join(best_chkpt_path, 'chk_dict.pkl'),'rb') as fp:
+                loaded_checkpoint_state = raypickle.load(fp)
+                
+                model.load_state_dict(loaded_checkpoint_state['model_state_dict'])
+                optimizer.load_state_dict(loaded_checkpoint_state['optimizer_state_dict'])
                 
         trn.train_S2S(model,optimizer, loss_fn, trainloader, valloader, scheduler, init["num_epochs"], 
                   init["check_epochs"],init["pred_steps"],X_tens[0], y_tens[0], X_tens[1], y_tens[1],
                   config["tf_ratio"], config["dynamic_tf"], config["training_prediction"],
-                  saveas='S2S_out',batch_loss=config["batch_loss"],tuning=True)
+                  saveas='S2S_out',batch_loss=config["batch_loss"],tuning=tuning)
 
     else:
         raise ValueError('Model selected is not configured/does not exist. Double check input.')
@@ -128,6 +145,63 @@ def load_data(model_choice):
     return windowed_in_tens, windowed_out_tens, in_casebatch, out_casebatch, test_array, testset_labels
 
 
+def run_tuning(config, model_choice, init, X_tens, y_tens, scheduler, 
+               num_samples, log_file_path, best_chkpt_path, tuning):
+    
+    with open(log_file_path, 'w',encoding='utf-8', errors='ignore') as f, redirect_stdout(f):
+
+        try:
+            tuner = tune.run(
+                partial(train_tune,
+                        model_choice=model_choice,
+                        init=init,
+                        X_tens=X_tens,
+                        y_tens=y_tens,
+                        best_chkpt_path=best_chkpt_path,
+                        tuning=tuning),
+                config=config,
+                num_samples=num_samples,
+                scheduler=scheduler,
+                local_dir=os.path.join(tuningmod_savepath, model_choice)
+            )
+
+            return tuner
+        
+        finally:
+            sys.stdout.flush()
+
+
+def further_train(model_choice, init_training, X_tens, y_tens, best_trial,best_chkpt):
+    
+    config_training = best_trial.config
+
+    best_chkpt_path = best_chkpt.path
+    
+    ## save hyperparameters used forfurther  model trained for later plotting and rollout prediction
+    hyperparams = {
+        "input_size": init_training['input_size'],
+        "hidden_size": config_training['hidden_size'],
+        "output_size": init_training['output_size'],
+        "pred_steps": init_training['pred_steps'],
+        "batch_size": config_training['batch_size'],
+        "learning_rate": config_training['learning_rate'],
+        "num_epochs": init_training['num_epochs'],
+        "check_epochs": init_training['check_epochs'],
+        "steps_in": init_training['steps_in'],
+        "steps_out": init_training['steps_out'],
+        "tf_ratio": config_training['tf_ratio'],
+        "dynamic_tf": config_training['dynamic_tf']
+    }
+
+    with open(os.path.join(trainedmod_savepath,f'hyperparams_{model_choice}.txt'), "w") as file:
+
+        for key, value in hyperparams.items():
+            file.write(f"{key}: {value}\n")
+
+    ## Set to train further mode
+    train_tune(config_training, model_choice, init_training, X_tens, y_tens, best_chkpt_path, tuning=False)
+
+
 ########################################### MAIN ###########################################
 
 def main():
@@ -156,6 +230,7 @@ def main():
         'penalty_weight' : tune.choice([0.6,0.7,0.8,0.9])
     }
     
+    # Set constant parameters to intialize the LSTM
     init = {
         "input_size": X_tens[0].shape[-1],
         "output_size": y_tens[0].shape[-1],
@@ -164,6 +239,7 @@ def main():
         "check_epochs": 20
     }
 
+    # Configure and run RAY TUNING 
     scheduler = ASHAScheduler(
     metric='val_loss',
     mode='min',
@@ -174,20 +250,52 @@ def main():
 
     ray.shutdown()
     ray.init(num_cpus=num_cpus_to_allocate)
+    num_samples = 250
+    log_file_path = os.path.join(tuningmod_savepath,model_choice,f'logs/{model_choice}_tune_out.log')
 
-    tuner = tune.run(
-    partial(train_tune,model_choice=model_choice,
-            init=init,X_tens=X_tens,y_tens=y_tens),
-    config = search_space,
-    num_samples = 250, # number of hyperparameter configuration to try
-    scheduler=scheduler,
-    local_dir = os.path.join(tuningmod_savepath,model_choice)
-)
+    # Run the experiment
+    tuner = run_tuning(search_space, model_choice, init, X_tens, 
+                       y_tens,scheduler, num_samples, log_file_path, best_chkpt_path='', tuning=True)
     
+    # Extract results from tuning process
     best_trial = tuner.get_best_trial('val_loss', 'min', 'last')
+    best_chkpoint = tuner.get_best_checkpoint(best_trial,'val_loss','min')
 
+    ray.shutdown()
+
+    #### FURTHER TRAINING WITH TUNED MODEL ###
+
+    train_further = input('Train best tuned trial further? (y/n): ')
+
+    if train_further.lower() == 'y':
+    
+        ## Setting new init and config parameters for further training of best trial tuned
+        init_training = {
+            "input_size": X_tens[0].shape[-1],
+            "output_size": y_tens[0].shape[-1],
+            "pred_steps": 50,
+            "num_epochs": 2000,
+            "check_epochs": 100,
+            "steps_in": 50,
+            "steps_out": 50
+    }
+        
+        further_train(model_choice,init_training,X_tens,y_tens,best_trial,best_chkpoint)
+
+    print(f'Finished tuning hyperparameters with {num_samples} samples')
     print(f'Best trial id: {best_trial.trial_id}')
     print(f'Best trial config: {best_trial.config}')
+
+    # Saving best model and config to external path
+    best_model_path = os.path.join(tuningmod_savepath,f'best_models/{model_choice}')
+
+    shutil.copy(f'{best_chkpoint.path}/chk_dict.pkl',best_model_path)
+
+    with open(f'{best_model_path}/config_{model_choice}.pkl', 'wb') as pickle_file:
+
+        pickle.dump(best_trial.config, pickle_file)
+
+    print('Model state and config settings copied to best_model folder')
 
 
 if __name__ == "__main__":

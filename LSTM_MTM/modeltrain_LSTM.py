@@ -1,5 +1,5 @@
 ### LSTM windowing and model training
-### Author: Juan Pablo Valdes
+### Authors: Juan Pablo Valdes and Fuyue Liang
 ### Code adapted from Fuyue Liang LSTM for stirred vessels
 ### First commit: Oct, 2023
 ### Department of Chemical Engineering, Imperial College London
@@ -18,6 +18,7 @@ import torch.optim as optim
 import torch.utils.data as data
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from tools_modeltraining import custom_loss, EarlyStopping
+import input as ipt
 from collections import namedtuple
 
 ## For tuning
@@ -39,7 +40,7 @@ import ray.cloudpickle as raypickle
 
 fig_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/figs/'
 input_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/input_data/'
-trainedmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/trained_models/'
+trainedmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/svtrained_models/'
 tuningmod_savepath = '/media/fl18/Elements/Hypertuning/'
 
 ## Plot setup
@@ -69,7 +70,7 @@ fine_labels = {
     'b03': r'$\beta=0.3$','b06':r'$\beta=0.6$','bi001':r'$Bi=0.01$','bi01':r'$Bi=0.1$','da01': r'$Da=0.1$','da1':r'$Da=1$',
     'b06pm':r'$\beta_{pm}=0.6$,','b09pm':r'$\beta_{pm}=0.9$,','bi001pm':r'$Bi_{pm}=0.01$,',
     'bi1':r'$Bi=1$','bi01pm':r'$Bi=0.1$,','3drop':r'3-Drop',
-    'b09':r'$\beta=0.9$','da01pm':r'$Da_{pm}=0.1$, ','da001':r'$Da=0.01$', 'coarsepm':r'coarse pm'
+    'b09':r'$\beta=0.9$','da01pm':r'$Da_{pm}=0.1$, ','da001':r'$Da=0.01$', 'coarsepm':r'Pre-Mix'
 }
 
 ##################################### CLASSES #################################################
@@ -129,6 +130,7 @@ class Window_data():
             for i in range(data.shape[-1]):
 
                 for case, idx in zip(case_labels, range(len(case_labels))):
+
                     plot_label = fine_labels.get(case,case)
                     ax[i].plot(split_set[:,idx,i],label = f'{plot_label}',color=color_palette[idx % len(color_palette)])
                     ax[i].set_title(f'{label}: {features[i]}')
@@ -362,9 +364,32 @@ class LSTM_S2S(nn.Module):
         else:
             return 0
 
+##################################### INPUT_DATA FUN. ################################################
+
+def input_data(svcases, features,smoothing_method):
+ 
+    # scaled input data 
+    post_dict = ipt.scale_inputs(svcases,features)
+
+    # re-shaped input data
+    shaped_input = ipt.shape_inputdata(post_dict)
+
+    #plotting
+    ipt.plot_inputdata(svcases,fine_labels,shaped_input)
+
+    # smoothing data
+    smoothed_data = ipt.smoothing(shaped_input,smoothing_method,window_size=5,poly_order=3,lowess_frac=None)
+
+    ipt.plot_smoothdata(shaped_input, smoothed_data,fine_labels, smoothing_method, svcases)
+
+    ## saving input data 
+
+    with open(os.path.join(input_savepath,'inputdata.pkl'),'wb') as file:
+        pickle.dump(smoothed_data,file)
+
 ##################################### WINDOWING FUN. #################################################
 
-def windowing(steps_in,steps_out,stride):
+def windowing(steps_in,steps_out,stride,train_frac,test_frac,svcases, features):
     ## Class instance declarations:
     windowing = Window_data()
 
@@ -375,21 +400,10 @@ def windowing(steps_in,steps_out,stride):
     'train_arr', 'val_arr', 'test_arr', 'splitset_labels'
     ])
 
-    # Allcases = ['b03','b06','bi001','bi01','da01','da1','b06pm','b09pm','bi001pm',
-    # 'bi1','bi01pm','3drop',
-    # 'b09','da01pm','da001', 'coarsepm']
-
-    svcases = ['Bi0001','Bi0002','Bi0004','Bi001','B07','clean','B09','B05','Bi1']
-
-    features = ['Number of drops', 'Interfacial Area']
-
     # Reading saved re-shaped input data from file
     with open(os.path.join(input_savepath,'svinputdata.pkl'), 'rb') as file:
         input_df = pickle.load(file)
     
-    ## data splitting for training, validating and testing
-    train_frac = 0.7
-    test_frac = 0.15
 
     train_arr, val_arr, test_arr, splitset_labels = windowing.split_cases(
         input_df, train_frac, test_frac, svcases)
@@ -420,9 +434,9 @@ def windowing(steps_in,steps_out,stride):
         splitset_labels=splitset_labels
     )
 
-####################################### SAVING FUN. #####################################
+####################################### SAVING FUN. ##################################################
 
-def saving_data(wd,hp,model_choice):
+def saving_data(wd,hp,model_choice,save_hp=True):
     
     set_labels = ["train", "val", "test"]
     arrays = [wd.train_arr, wd.val_arr, wd.test_arr]
@@ -464,27 +478,30 @@ def saving_data(wd,hp,model_choice):
         print(f"Saved torch package y_{setlbl}.pt")
     
     ## save hyperparameters used for model trained for later plotting and rollout prediction
-    hyperparams = {
-        "input_size": hp.input_size,
-        "hidden_size": hp.hidden_size,
-        "output_size": hp.output_size,
-        "pred_steps": hp.pred_steps,
-        "batch_size": hp.batch_size,
-        "learning_rate": hp.learning_rate,
-        "num_epochs": hp.num_epochs,
-        "check_epochs": hp.check_epochs,
-        "steps_in": hp.steps_in,
-        "steps_out": hp.steps_out,
-        "tf_ratio": hp.tf_ratio,
-        "dynamic_tf": hp.dynamic_tf
-    }
 
-    with open(os.path.join(trainedmod_savepath,f'hyperparams_{model_choice}.txt'), "w") as file:
+    if save_hp:
 
-        for key, value in hyperparams.items():
-            file.write(f"{key}: {value}\n")
+        hyperparams = {
+            "input_size": hp.input_size,
+            "hidden_size": hp.hidden_size,
+            "output_size": hp.output_size,
+            "pred_steps": hp.pred_steps,
+            "batch_size": hp.batch_size,
+            "learning_rate": hp.learning_rate,
+            "num_epochs": hp.num_epochs,
+            "check_epochs": hp.check_epochs,
+            "steps_in": hp.steps_in,
+            "steps_out": hp.steps_out,
+            "tf_ratio": hp.tf_ratio,
+            "dynamic_tf": hp.dynamic_tf
+        }
 
-####################################### TRAINING FUN. #####################################
+        with open(os.path.join(trainedmod_savepath,f'hyperparams_{model_choice}.txt'), "w") as file:
+
+            for key, value in hyperparams.items():
+                file.write(f"{key}: {value}\n")
+
+####################################### TRAINING FUN. #################################################
 
 def train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler,
                   num_epochs, check_epochs, 
@@ -510,7 +527,7 @@ def train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler,
 
         else:
             ### Early stopping feature to avoid overfitting during training, monitoring a minimum improvement threshold
-            early_stopping = EarlyStopping(model_name,patience=5, verbose=True)
+            early_stopping = EarlyStopping(model_name,patience=10, verbose=True)
 
         for epoch in range(num_epochs): #looping through epochs
             model.train() #set the model to train mode -- informing features to behave accordingly for training
@@ -650,7 +667,7 @@ def train_S2S(model, optimizer, loss_fn, trainloader,valloader,scheduler, num_ep
                         optimizer.load_state_dict(loaded_checkpoint_state['optimizer_state_dict'])
         else:
             ### Early stopping feature to avoid overfitting during training, monitoring a minimum improvement threshold
-            early_stopping = EarlyStopping(model_name,patience=5, verbose=True)
+            early_stopping = EarlyStopping(model_name,patience=10, verbose=True)
 
         for epoch in range(num_epochs): #looping through training epochs
             
@@ -809,7 +826,7 @@ def train_S2S(model, optimizer, loss_fn, trainloader,valloader,scheduler, num_ep
                 
     print('Finished training')
 
-########################################### MAIN ###########################################
+########################################### MAIN ########################################################
 
 def main():
 
@@ -819,7 +836,28 @@ def main():
     steps_in, steps_out = 50, 50
     stride = 1
 
-    windowed_data = windowing(steps_in,steps_out,stride)
+    ## Cases to split and features to read from 
+    # Allcases = ['b03','b06','bi001','bi01','da01','da1','b06pm','b09pm','bi001pm',
+    # 'bi1','bi01pm','3drop',
+    # 'b09','da01pm','da001', 'coarsepm']
+
+    svcases = ['Bi0001','Bi0002','Bi0004','Bi001','B07','clean','B09','B05','Bi1']
+
+    features = ['Number of drops', 'Interfacial Area']
+
+    smoothing_method = 'savgol'
+
+    ## Re process raw data to swap cases between train, validation and test split sets. Order will depend on svcases list and train/test fracs.
+    choice = input('Re-process raw data sets before windowing? (y/n) : ')
+
+    if choice.lower() == 'y':
+        input_data(svcases,features,smoothing_method)
+
+    ## data splitting for training, validating and testing
+    train_frac = 0.7
+    test_frac = 0.15
+
+    windowed_data = windowing(steps_in,steps_out,stride,train_frac, test_frac, svcases,features)
 
     ## Extracting from named tuple
     X_train = windowed_data.X_train.to(torch.float32)

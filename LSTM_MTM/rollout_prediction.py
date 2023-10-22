@@ -24,7 +24,7 @@ from sklearn.metrics import r2_score
 #trainedmod_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/trained_models/'
 
 fig_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/figs/'
-trainedmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/trained_models/'
+trainedmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/svtrained_models/'
 
 ## Plot setup
 
@@ -53,7 +53,7 @@ fine_labels = {
     'b03': r'$\beta=0.3$','b06':r'$\beta=0.6$','bi001':r'$Bi=0.01$','bi01':r'$Bi=0.1$','da01': r'$Da=0.1$','da1':r'$Da=1$',
     'b06pm':r'$\beta_{pm}=0.6$,','b09pm':r'$\beta_{pm}=0.9$,','bi001pm':r'$Bi_{pm}=0.01$,',
     'bi1':r'$Bi=1$','bi01pm':r'$Bi=0.1$,','3drop':r'3-Drop',
-    'b09':r'$\beta=0.9$','da01pm':r'$Da_{pm}=0.1$, ','da001':r'$Da=0.01$', 'coarsepm':r'coarse pm'
+    'b09':r'$\beta=0.9$','da01pm':r'$Da_{pm}=0.1$, ','da001':r'$Da=0.01$', 'coarsepm':r'Pre-Mix'
 }
 
 ####################################### ROLLOUT PREDICTION #####################################
@@ -90,7 +90,7 @@ def rollout(model, input_seq, steps_out,total_steps):
 
 ####################################### PLOTTING FUN. #####################################
 
-def plot_model_pred(model,fine_labels, model_name,features,set_labels,set,
+def plot_model_pred(model,fine_lables, model_name,features,set_labels,set,
                     X_data,true_data,wind_size,casebatch_len):
 
     model.eval()
@@ -110,7 +110,10 @@ def plot_model_pred(model,fine_labels, model_name,features,set_labels,set,
         for seq, case in zip(range(num_cases), set_labels):
             # Target plots, true data from CFD
             plot_label = fine_labels.get(case,case)
-            p = plt.plot(true_data[:, seq, f_idx], label=f'Target {plot_label}', color=colors[seq % len(colors)], linewidth = 3) # true_data has shape [times,cases,features]
+
+            p = plt.plot(true_data[:, seq, f_idx], 
+                         label=f'Target {plot_label}', color=colors[seq % len(colors)], 
+                         linewidth = 3) # true_data has shape [times,cases,features]
             ax = plt.gca()
             
             plt.setp(ax.spines.values(),linewidth = 1.5)
@@ -141,7 +144,7 @@ def plot_model_pred(model,fine_labels, model_name,features,set_labels,set,
         fig.savefig(os.path.join(fig_savepath, f'Pred_{model_name}_{features[f_idx]}_{set}_set.png'), dpi=150)
         plt.show()
 
-def plot_rollout_pred(rollout_seq, fine_labels, true_data, features,set_labels, model_name):
+def plot_rollout_pred(rollout_seq, true_data, features,set_labels, fine_labels, model_name):
 
     colors = sns.color_palette("tab10", len(set_labels))
 
@@ -151,13 +154,15 @@ def plot_rollout_pred(rollout_seq, fine_labels, true_data, features,set_labels, 
         fig = plt.figure(figsize=(12,6))
 
         for i, case in enumerate(set_labels):
+
             plot_label = fine_labels.get(case,case)
             ## truedata shaped as (timesteps, cases, features) and rollout as (case,timestep,features)
             r2 = r2_score(true_data[:,i,f_idx],rollout_seq[i,:,f_idx][:true_data.shape[0]])
 
             p = plt.plot(true_data[:,i,f_idx], label=f'Target {plot_label}, $R^2$:{r2:.4f}',color = colors[i % len(colors)],linewidth = 3)
+
             plt.plot(rollout_seq[i,:,f_idx],'s',markersize=5,
-                     markerfacecolor=p[0].get_color(),alpha=0.8,markeredgewidth=1.5, markeredgecolor='k',markevery=5,
+                     markerfacecolor=p[0].get_color(),alpha=0.8,markeredgewidth=1.5, markeredgecolor='k',
                      lw=0.0, label=f'{model_name} Pred. {plot_label}')
             ax = plt.gca()
 
@@ -268,7 +273,7 @@ def main():
     ## Calling rollout prediction for test data
     rollout_seq = rollout(model,input_seq,hyperparams["steps_out"],total_steps)
 
-    plot_rollout_pred(rollout_seq,fine_labels,test_arr, features,splitset_labels[2], model_choice)
+    plot_rollout_pred(rollout_seq,test_arr, features,splitset_labels[2],fine_labels, model_choice)
 
 if __name__ == "__main__":
     main()

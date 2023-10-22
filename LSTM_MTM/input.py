@@ -55,8 +55,9 @@ fine_labels = {
     'b03': r'$\beta=0.3$','b06':r'$\beta=0.6$','bi001':r'$Bi=0.01$','bi01':r'$Bi=0.1$','da01': r'$Da=0.1$','da1':r'$Da=1$',
     'b06pm':r'$\beta_{pm}=0.6$,','b09pm':r'$\beta_{pm}=0.9$,','bi001pm':r'$Bi_{pm}=0.01$,',
     'bi1':r'$Bi=1$','bi01pm':r'$Bi=0.1$,','3drop':r'3-Drop',
-    'b09':r'$\beta=0.9$','da01pm':r'$Da_{pm}=0.1$, ','da001':r'$Da=0.01$', 'coarsepm':r'coarse pm'
+    'b09':r'$\beta=0.9$','da01pm':r'$Da_{pm}=0.1$, ','da001':r'$Da=0.01$', 'coarsepm':r'Pre-Mix'
 }
+
 
 ##### METHODS #####
 
@@ -146,12 +147,18 @@ def scale_inputs(cases,norm_columns):
     
     pre_dict, post_dict = sort_inputdata(cases)
 
+    feature_map = {'Number of drops': 'Nd',
+                   'Interfacial Area': 'IA'
+                   }
+    
     for case in cases:
         norm_data_case = pre_dict[case]
 
         # Loop through each column to be normalized
         for column in norm_columns:
-            norm_data = norm_data_case[column].values.astype('float64')
+
+            mapped_column = feature_map.get(column)
+            norm_data = norm_data_case[mapped_column].values.astype('float64')
             
             # Reshape the data to be compatible with the scaler
             norm_data = norm_data.reshape(-1, 1)
@@ -161,7 +168,7 @@ def scale_inputs(cases,norm_columns):
             scaler = scaler.fit(norm_data)
             
             # Transform and store the normalized data in the post_data dict. Post dict only holds dictionary with input variables per case
-            post_dict[case][column] = scaler.transform(norm_data).astype('float32')
+            post_dict[case][mapped_column] = scaler.transform(norm_data).astype('float32')
     
     return post_dict
 
@@ -232,7 +239,7 @@ def smoothing(data, method, window_size=None, poly_order=None, lowess_frac = Non
 
 #### PLOTS ####
 
-def plot_inputdata(cases,fine_labels, data,dpi=150):
+def plot_inputdata(cases, fine_labels, data,dpi=150):
     ### looping over the number of features (Nd and IA)
 
     features = ['Number of drops', 'Interfacial Area']
@@ -250,8 +257,9 @@ def plot_inputdata(cases,fine_labels, data,dpi=150):
             spine.set_linewidth(1.5)
 
         for idx, case in enumerate(cases):
-            plot_label = fine_labels.get(case,case)
-            ax.plot(data[:, idx, i], label=f'{plot_label}', color=colors[idx % len(colors)])
+
+            label = fine_labels.get(case,case)
+            ax.plot(data[:, idx, i], label=f'{label}', color=colors[idx % len(colors)])
             ax.tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', length=5, width=1.5)
             ax.grid(color='k', linestyle=':', linewidth=0.1)
 
@@ -262,7 +270,7 @@ def plot_inputdata(cases,fine_labels, data,dpi=150):
     plt.savefig(os.path.join(fig_savepath,'input_data'),dpi=dpi)
     plt.show()
 
-def plot_smoothdata(data, fine_labels, smoothed_data, method, cases,dpi=150):
+def plot_smoothdata(data, smoothed_data, fine_labels, method, cases,dpi=150):
     
     fig, ax = plt.subplots(1,2, figsize=(12,8), dpi=dpi, num=2)
     colors = sns.color_palette('muted', len(cases))
@@ -289,6 +297,7 @@ def plot_smoothdata(data, fine_labels, smoothed_data, method, cases,dpi=150):
     fig.suptitle(f'Smoothing method: {method}', fontsize=18)
 
     ax[1].legend(labels=[f'{fine_labels.get(case,case)}' for case in cases])
+    ax[1].legend(labels=[f'{fine_labels.get(case,case)}' for case in cases])
 
     for ax in ax:
         for spine in ax.spines.values():
@@ -309,7 +318,7 @@ def main():
     svcases = ['Bi0001','Bi0002','Bi0004','Bi001','B07','clean','B09','B05','Bi1']
 
     # List of columns to be normalized
-    norm_columns = ['Nd', 'IA']
+    norm_columns = ['Number of drops', 'Interfacial Area']
 
     # scaled input data 
     post_dict = scale_inputs(svcases,norm_columns)
