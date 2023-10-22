@@ -111,12 +111,18 @@ def scale_inputs(cases,norm_columns):
     
     pre_dict, post_dict = sort_inputdata(cases)
 
+    feature_map = {'Number of drops': 'Nd',
+                   'Interfacial Area': 'IA'
+                   }
+    
     for case in cases:
         norm_data_case = pre_dict[case]
 
         # Loop through each column to be normalized
         for column in norm_columns:
-            norm_data = norm_data_case[column].values.astype('float64')
+
+            mapped_column = feature_map.get(column)
+            norm_data = norm_data_case[mapped_column].values.astype('float64')
             
             # Reshape the data to be compatible with the scaler
             norm_data = norm_data.reshape(-1, 1)
@@ -126,7 +132,7 @@ def scale_inputs(cases,norm_columns):
             scaler = scaler.fit(norm_data)
             
             # Transform and store the normalized data in the post_data dict. Post dict only holds dictionary with input variables per case
-            post_dict[case][column] = scaler.transform(norm_data).astype('float32')
+            post_dict[case][mapped_column] = scaler.transform(norm_data).astype('float32')
     
     return post_dict
 
@@ -272,7 +278,7 @@ def main():
     'b09','da01pm','da001', 'coarsepm']
 
     # List of columns to be normalized
-    norm_columns = ['Nd', 'IA']
+    norm_columns = ['Number of drops', 'Interfacial Area']
 
     # scaled input data 
     post_dict = scale_inputs(Allcases,norm_columns)
