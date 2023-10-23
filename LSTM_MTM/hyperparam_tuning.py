@@ -220,12 +220,12 @@ def main():
     search_space = {
         'hidden_size': tune.choice([2 ** i for i in range(5,9)]),
         'learning_rate': tune.loguniform(0.0001, 0.1), # uniformly sampled between 0.0001 and 0.1
-        'batch_size': tune.choice(range(5,40,5)),
+        'batch_size': tune.choice(range(6,40,2)),
         'training_prediction': tune.choice(['teacher_forcing', 'mixed']),
         'tf_ratio': tune.choice([0.05,0.1,0.3,0.5,0.7]),
         'dynamic_tf': tune.choice(['True', 'False']),
-        'l1_lambda' : tune.loguniform(0.0001, 0.1),
-        'l2_lambda' : tune.loguniform(0.0001, 0.1),
+        'l1_lambda' : tune.loguniform(0.00001, 1),
+        'l2_lambda' : tune.loguniform(0.00001, 1),
         'batch_loss' : tune.choice(['True', 'False']),
         'penalty_weight' : tune.choice([0.6,0.7,0.8,0.9])
     }
@@ -234,7 +234,7 @@ def main():
     init = {
         "input_size": X_tens[0].shape[-1],
         "output_size": y_tens[0].shape[-1],
-        "pred_steps": 15,
+        "pred_steps": 20,
         "num_epochs": 100,
         "check_epochs": 20
     }
@@ -250,7 +250,7 @@ def main():
 
     ray.shutdown()
     ray.init(num_cpus=num_cpus_to_allocate)
-    num_samples = 200
+    num_samples = 300
     log_file_path = os.path.join(tuningmod_savepath,model_choice,f'logs/{model_choice}_tune_out.log')
 
     # Run the experiment
@@ -273,11 +273,11 @@ def main():
         init_training = {
             "input_size": X_tens[0].shape[-1],
             "output_size": y_tens[0].shape[-1],
-            "pred_steps": 15,
+            "pred_steps": 20,
             "num_epochs": 3000,
             "check_epochs": 100,
-            "steps_in": 30,
-            "steps_out": 15
+            "steps_in": 40,
+            "steps_out": 20
     }
         
         further_train(model_choice,init_training,X_tens,y_tens,best_trial,best_chkpoint)

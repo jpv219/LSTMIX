@@ -15,6 +15,7 @@ from scipy.signal import savgol_filter
 from statsmodels.nonparametric.smoothers_lowess import lowess
 import os
 import pickle
+import random
 
 ## Env. variables ##
 
@@ -280,27 +281,33 @@ def main():
     'bi1','bi01pm','3drop',
     'b09','da01pm','da001', 'coarsepm']
 
+    cases = random.sample(Allcases,len(Allcases))
+
     # List of columns to be normalized
     norm_columns = ['Number of drops', 'Interfacial Area']
 
     # scaled input data 
-    post_dict = scale_inputs(Allcases,norm_columns)
+    post_dict = scale_inputs(cases,norm_columns)
 
     # re-shaped input data
     shaped_input = shape_inputdata(post_dict)
 
     #plotting
-    plot_inputdata(Allcases,fine_labels,shaped_input)
+    plot_inputdata(cases,fine_labels,shaped_input)
 
     # smoothing data
     smoothed_data = smoothing(shaped_input,'savgol',window_size=5,poly_order=3)
 
-    plot_smoothdata(shaped_input, smoothed_data,fine_labels, 'savgol', Allcases)
+    plot_smoothdata(shaped_input, smoothed_data,fine_labels, 'savgol', cases)
 
     ## saving input data 
 
+    save_dict = {'smoothed_data' : smoothed_data,
+                 'case_labels' : cases,
+                 'features' : norm_columns}
+
     with open(os.path.join(input_savepath,'inputdata.pkl'),'wb') as file:
-        pickle.dump(smoothed_data,file)
+        pickle.dump(save_dict,file)
 
 if __name__ == "__main__":
     main()

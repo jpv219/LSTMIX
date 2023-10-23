@@ -6,9 +6,14 @@
 #########################################################################################################################################################
 
 import modeltrain_LSTM as trn
+import random
+import os
+import pickle
 
 ## env. variables 
 trainedmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/trained_models/'
+input_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/input_data/'
+
 
 ########################################### MAIN ###########################################
 
@@ -17,15 +22,8 @@ def main():
     ####### WINDOW DATA ########
 
     ## Windowing hyperparameters
-    steps_in, steps_out = 30, 15
+    steps_in, steps_out = 40, 20
     stride = 1
-
-    ## Cases to split and features to read from 
-    Allcases = ['b03','b06','bi001','bi01','da01','da1','b06pm','b09pm','bi001pm',
-    'bi1','bi01pm','3drop',
-    'b09','da01pm','da001', 'coarsepm']
-
-    features = ['Number of drops', 'Interfacial Area']
 
     ## Smoothing parameters
     smoothing_method = 'savgol'
@@ -39,13 +37,33 @@ def main():
     choice = input('Re-process raw data sets before windowing? (y/n) : ')
 
     if choice.lower() == 'y':
-        trn.input_data(Allcases,features,smoothing_method,smoothing_params)
 
+        ## Cases to split and features to read from 
+        Allcases = ['b03','b06','bi001','bi01','da01','da1','b06pm','b09pm','bi001pm',
+        'bi1','bi01pm','3drop',
+        'b09','da01pm','da001', 'coarsepm']
+
+        # Random sampling
+        cases = random.sample(Allcases,len(Allcases))
+
+        features = ['Number of drops', 'Interfacial Area']
+
+        trn.input_data(cases,features,smoothing_method,smoothing_params)
+
+    # Reading saved re-shaped input data from file
+    with open(os.path.join(input_savepath,'inputdata.pkl'), 'rb') as file:
+        input_pkg = pickle.load(file)
+
+    # Reading input data sets and labels previously processed and stored
+    input_df = input_pkg['smoothed_data']
+    Allcases = input_pkg['case_labels']
+    features = input_pkg['features']
+    
     ## data splitting for training, validating and testing
     train_frac = 9/16
-    test_frac = 4/16
+    test_frac = 3/16
 
-    windowed_data = trn.windowing(steps_in,steps_out,stride,train_frac, test_frac, Allcases,features)
+    windowed_data = trn.windowing(steps_in,steps_out,stride,train_frac, test_frac, input_df, Allcases,features)
 
     model_choice = input('Which model would you like to generate data for? (DMS/S2S): ')
 

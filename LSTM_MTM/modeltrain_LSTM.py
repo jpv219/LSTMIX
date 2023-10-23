@@ -389,12 +389,16 @@ def input_data(Allcases, features,smoothing_method,smoothing_params):
 
     ## saving input data 
 
+    save_dict = {'smoothed_data' : smoothed_data,
+                 'case_labels' : Allcases,
+                 'features' : features}
+
     with open(os.path.join(input_savepath,'inputdata.pkl'),'wb') as file:
-        pickle.dump(smoothed_data,file)
+        pickle.dump(save_dict,file)
 
 ##################################### WINDOWING FUN. #################################################
 
-def windowing(steps_in,steps_out,stride,train_frac,test_frac,Allcases, features):
+def windowing(steps_in,steps_out,stride,train_frac,test_frac, input_df, Allcases, features):
     ## Class instance declarations:
     windowing = Window_data()
 
@@ -403,12 +407,7 @@ def windowing(steps_in,steps_out,stride,train_frac,test_frac,Allcases, features)
     'X_train', 'y_train', 'train_casebatch',
     'X_val', 'y_val', 'val_casebatch',
     'train_arr', 'val_arr', 'test_arr', 'splitset_labels'
-    ])
-
-    # Reading saved re-shaped input data from file
-    with open(os.path.join(input_savepath,'inputdata.pkl'), 'rb') as file:
-        input_df = pickle.load(file)
-    
+    ])    
 
     train_arr, val_arr, test_arr, splitset_labels = windowing.split_cases(
         input_df, train_frac, test_frac, Allcases)
@@ -841,13 +840,6 @@ def main():
     steps_in, steps_out = 30, 15
     stride = 1
 
-    ## Cases to split and features to read from 
-    Allcases = ['b03','b06','bi001','bi01','da01','da1','b06pm','b09pm','bi001pm',
-    'bi1','bi01pm','3drop',
-    'b09','da01pm','da001', 'coarsepm']
-
-    features = ['Number of drops', 'Interfacial Area']
-
     ## Smoothing parameters
     smoothing_method = 'savgol'
     window_size = 5 # needed for moveavg and savgol
@@ -860,13 +852,33 @@ def main():
     choice = input('Re-process raw data sets before windowing? (y/n) : ')
 
     if choice.lower() == 'y':
-        input_data(Allcases,features,smoothing_method,smoothing_params)
+
+        ## Cases to split and features to read from 
+        Allcases = ['b03','b06','bi001','bi01','da01','da1','b06pm','b09pm','bi001pm',
+        'bi1','bi01pm','3drop',
+        'b09','da01pm','da001', 'coarsepm']
+
+        #Random sampling
+        cases = random.sample(Allcases,len(Allcases))
+
+        features = ['Number of drops', 'Interfacial Area']
+
+        input_data(cases,features,smoothing_method,smoothing_params)
+
+    # Reading saved re-shaped input data from file
+    with open(os.path.join(input_savepath,'inputdata.pkl'), 'rb') as file:
+        input_pkg = pickle.load(file)
+
+    # Reading input data sets and labels previously processed and stored
+    input_df = input_pkg['smoothed_data']
+    Allcases = input_pkg['case_labels']
+    features = input_pkg['features']
 
     ## data splitting for training, validating and testing
     train_frac = 9/16
     test_frac = 4/16
 
-    windowed_data = windowing(steps_in,steps_out,stride,train_frac, test_frac, Allcases,features)
+    windowed_data = windowing(steps_in,steps_out,stride,train_frac, test_frac, input_df, Allcases,features)
 
     ## Extracting from named tuple
     X_train = windowed_data.X_train
