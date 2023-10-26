@@ -91,7 +91,7 @@ def rollout(model, input_seq, steps_out,total_steps):
 
 ####################################### PLOTTING FUN. #####################################
 
-def plot_model_pred(model,fine_labels, model_name,features,set_labels,set,
+def plot_model_pred(model, model_name,features,set_labels,set,
                     X_data,true_data,wind_size,casebatch_len):
 
     model.eval()
@@ -175,7 +175,7 @@ def plot_model_pred(model,fine_labels, model_name,features,set_labels,set,
         fig.savefig(os.path.join(fig_savepath, f'Pred_{model_name}_{features[f_idx]}_{set}_set.png'), dpi=150)
         plt.show()
 
-def plot_rollout_pred(rollout_seq, true_data, input_steps, features,set_labels, fine_labels, model_name):
+def plot_rollout_pred(rollout_seq, true_data, input_steps, features,set_labels, model_name):
 
     colors = sns.color_palette("hsv", len(set_labels))
 
@@ -240,7 +240,7 @@ def main():
             key, value = line.strip().split(": ")  # Split each line into key and value
             hyperparams[key] = eval(value)
 
-    ## Lading numpyarrays for all split datasets and labels, as well as windowed training and val tensors with casebatch lengths
+    ## Loading numpyarrays for all split datasets and labels, as well as windowed training and val tensors with casebatch lengths
     for setlbl in set_labels:
         npfile = os.path.join(trainedmod_savepath,f'data_sets_{model_choice}', f'{setlbl}_pkg.pkl')
         ptfile = os.path.join(trainedmod_savepath,f'data_sets_{model_choice}', f'X_{setlbl}.pt')
@@ -287,10 +287,10 @@ def main():
         val_casebatch = casebatches[1]
 
         # using windowed tensors for plots to represent final training and validation state
-        plot_model_pred(model, fine_labels, model_choice, features, splitset_labels[0],
+        plot_model_pred(model, model_choice, features, splitset_labels[0],
                         'Train',X_train, train_arr, wind_size, train_casebatch)
         
-        plot_model_pred(model,fine_labels, model_choice, features, splitset_labels[1],
+        plot_model_pred(model, model_choice, features, splitset_labels[1],
                 'Validation',X_val, val_arr, wind_size, val_casebatch)
     else:
         pass
@@ -307,7 +307,7 @@ def main():
     ## Calling rollout prediction for test data
     rollout_seq = rollout(model,input_seq,hyperparams["steps_out"],total_steps)
 
-    plot_rollout_pred(rollout_seq,test_arr, hyperparams['steps_in'], features,splitset_labels[2],fine_labels, model_choice)
+    plot_rollout_pred(rollout_seq,test_arr, hyperparams['steps_in'], features,splitset_labels[2], model_choice)
 
 if __name__ == "__main__":
     main()
