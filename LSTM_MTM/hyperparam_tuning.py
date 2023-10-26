@@ -216,25 +216,41 @@ def main():
     total_cpus = psutil.cpu_count(logical=False)
     num_cpus_to_allocate = int(total_cpus * percent_cpu_to_occupy)
 
-    #configure the hyperparameter search space
-    search_space = {
-        'hidden_size': tune.choice([2 ** i for i in range(5,9)]),
-        'learning_rate': tune.loguniform(0.0001, 0.1), # uniformly sampled between 0.0001 and 0.1
-        'batch_size': tune.choice(range(6,40,2)),
-        'training_prediction': tune.choice(['teacher_forcing', 'mixed']),
-        'tf_ratio': tune.choice([0.05,0.1,0.3,0.5,0.7]),
-        'dynamic_tf': tune.choice(['True', 'False']),
-        'l1_lambda' : tune.loguniform(0.00001, 1),
-        'l2_lambda' : tune.loguniform(0.00001, 1),
-        'batch_loss' : tune.choice(['True', 'False']),
-        'penalty_weight' : tune.choice([0.6,0.7,0.8,0.9])
+    #configure the hyperparameter search spaces for each model to tune
+    search_spaces = {
+        'DMS': {
+            'hidden_size': tune.choice([2 ** i for i in range(6, 9)]),
+            'learning_rate': tune.choice([0.005,0.01]),
+            'batch_size': tune.choice(range(10, 40, 5)),
+            'training_prediction': tune.choice(['none']),
+            'tf_ratio': tune.choice([0]),
+            'dynamic_tf': tune.choice(['False']),
+            'l1_lambda': tune.choice([0, 0.00001, 0.0001]),
+            'l2_lambda': tune.choice([0, 0.00001, 0.0001]),
+            'batch_loss': tune.choice(['False']),
+            'penalty_weight': tune.choice([0.1,1,10])
+        },
+        'S2S': {
+            'hidden_size': tune.choice([2 ** i for i in range(6, 9)]),
+            'learning_rate': tune.choice([0.005,0.01]),
+            'batch_size': tune.choice(range(8, 44, 4)),
+            'training_prediction': tune.choice(['teacher_forcing', 'mixed']),
+            'tf_ratio': tune.choice([0.02, 0.1, 0.2, 0.4]),
+            'dynamic_tf': tune.choice(['True']),
+            'l1_lambda': tune.choice([0]),
+            'l2_lambda': tune.choice([0]),
+            'batch_loss': tune.choice(['False']),
+            'penalty_weight': tune.choice([0.1,1, 10])
+        }
     }
+
+    search_space = search_spaces[model_choice]
     
     # Set constant parameters to intialize the LSTM
     init = {
         "input_size": X_tens[0].shape[-1],
         "output_size": y_tens[0].shape[-1],
-        "pred_steps": 20,
+        "pred_steps": 30,
         "num_epochs": 100,
         "check_epochs": 20
     }
@@ -244,13 +260,13 @@ def main():
     metric='val_loss',
     mode='min',
     max_t= init["num_epochs"],
-    grace_period=20, # save period without early stopping
+    grace_period=40, # save period without early stopping
     reduction_factor=2,
     )
 
     ray.shutdown()
     ray.init(num_cpus=num_cpus_to_allocate)
-    num_samples = 300
+    num_samples = 1800
     log_file_path = os.path.join(tuningmod_savepath,model_choice,f'logs/{model_choice}_tune_out.log')
 
     # Run the experiment
@@ -262,25 +278,6 @@ def main():
     best_chkpoint = tuner.get_best_checkpoint(best_trial,'val_loss','min')
 
     ray.shutdown()
-
-    #### FURTHER TRAINING WITH TUNED MODEL ###
-
-    train_further = input('Train best tuned trial further? (y/n): ')
-
-    if train_further.lower() == 'y':
-    
-        ## Setting new init and config parameters for further training of best trial tuned
-        init_training = {
-            "input_size": X_tens[0].shape[-1],
-            "output_size": y_tens[0].shape[-1],
-            "pred_steps": 20,
-            "num_epochs": 3000,
-            "check_epochs": 100,
-            "steps_in": 40,
-            "steps_out": 20
-    }
-        
-        further_train(model_choice,init_training,X_tens,y_tens,best_trial,best_chkpoint)
 
     print(f'Finished tuning hyperparameters with {num_samples} samples')
     print(f'Best trial id: {best_trial.trial_id}')
@@ -296,6 +293,25 @@ def main():
         pickle.dump(best_trial.config, pickle_file)
 
     print('Model state and config settings copied to best_model folder')
+
+    #### FURTHER TRAINING WITH TUNED MODEL ###
+
+    train_further = input('Train best tuned trial further? (y/n): ')
+
+    if train_further.lower() == 'y':
+    
+        ## Setting new init and config parameters for further training of best trial tuned
+        init_training = {
+            "input_size": X_tens[0].shape[-1],
+            "output_size": y_tens[0].shape[-1],
+            "pred_steps": 30,
+            "num_epochs": 3000,
+            "check_epochs": 100,
+            "steps_in": 40,
+            "steps_out": 30
+    }
+        
+        further_train(model_choice,init_training,X_tens,y_tens,best_trial,best_chkpoint)
 
 
 if __name__ == "__main__":

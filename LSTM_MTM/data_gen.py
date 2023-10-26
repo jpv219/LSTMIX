@@ -22,7 +22,7 @@ def main():
     ####### WINDOW DATA ########
 
     ## Windowing hyperparameters
-    steps_in, steps_out = 40, 20
+    steps_in, steps_out = 40, 30
     stride = 1
 
     ## Smoothing parameters
@@ -39,16 +39,16 @@ def main():
     if choice.lower() == 'y':
 
         ## Cases to split and features to read from 
-        Allcases = ['b03','b06','bi001','bi01','da01','da1','b06pm','b09pm','bi001pm',
-        'bi1','bi01pm','3drop',
-        'b09','da01pm','da001', 'coarsepm']
+        Allcases = ['bi001', 'bi01', 'b09', 'b06pm', 'b03', 'da01pm', 'da01', 'bi01pm', '3drop',
+        'coarsepm', 'bi001pm', 'bi1',
+        'b06', 'b09pm', 'da1', 'da001']
 
         # Random sampling
         cases = random.sample(Allcases,len(Allcases))
 
         features = ['Number of drops', 'Interfacial Area']
 
-        trn.input_data(cases,features,smoothing_method,smoothing_params)
+        trn.input_data(Allcases,features,smoothing_method,smoothing_params)
 
     # Reading saved re-shaped input data from file
     with open(os.path.join(input_savepath,'inputdata.pkl'), 'rb') as file:
@@ -61,7 +61,7 @@ def main():
     
     ## data splitting for training, validating and testing
     train_frac = 9/16
-    test_frac = 3/16
+    test_frac = 4/16
 
     windowed_data = trn.windowing(steps_in,steps_out,stride,train_frac, test_frac, input_df, Allcases,features)
 
