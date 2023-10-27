@@ -267,7 +267,7 @@ def main():
 
     ray.shutdown()
     ray.init(num_cpus=num_cpus_to_allocate)
-    num_samples = 250
+    num_samples = 400
     log_file_path = os.path.join(tuningmod_savepath,model_choice,f'logs/{model_choice}_tune_out.log')
 
     # Run the experiment
@@ -279,6 +279,21 @@ def main():
     best_chkpoint = tuner.get_best_checkpoint(best_trial,'val_loss','min')
 
     ray.shutdown()
+
+    print(f'Finished tuning hyperparameters with {num_samples} samples')
+    print(f'Best trial id: {best_trial.trial_id}')
+    print(f'Best trial config: {best_trial.config}')
+
+    # Saving best model and config to external path
+    best_model_path = os.path.join(tuningmod_savepath,f'best_models/{model_choice}')
+
+    shutil.copy(f'{best_chkpoint.path}/chk_dict.pkl',best_model_path)
+
+    with open(f'{best_model_path}/config_{model_choice}.pkl', 'wb') as pickle_file:
+
+        pickle.dump(best_trial.config, pickle_file)
+
+    print('Model state and config settings copied to best_model folder')
 
     #### FURTHER TRAINING WITH TUNED MODEL ###
 

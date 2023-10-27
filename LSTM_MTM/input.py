@@ -318,7 +318,7 @@ def main():
     # 'bi1','bi01pm','3drop',
     # 'b09','da01pm','da001', 'coarsepm']
 
-    svcases = ['Bi0001','Bi0002','Bi0004','Bi001','B07','clean','B09','B05','Bi1']
+    svcases = ['Bi0001','Bi0002','Bi001','B07','clean','Bi1','Bi0004','B09','B05']
 
     # List of columns to be normalized
     norm_columns = ['Number of drops', 'Interfacial Area']
@@ -335,7 +335,7 @@ def main():
     # smoothing data
     smoothed_data = smoothing(shaped_input,'lowess',lowess_frac=0.03)
 
-    plot_smoothdata(shaped_input,fine_labels,smoothed_data,'lowess',svcases)
+    plot_smoothdata(shaped_input,smoothed_data,fine_labels,'lowess',svcases)
 
     ## saving input data 
 

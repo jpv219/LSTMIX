@@ -26,6 +26,7 @@ from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 fig_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/figs/'
 trainedmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/trained_svmodels/'
+trainedmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/trained_svmodels/'
 
 ## Plot setup
 
@@ -91,7 +92,7 @@ def rollout(model, input_seq, steps_out,total_steps):
 
 ####################################### PLOTTING FUN. #####################################
 
-def plot_model_pred(model, model_name,features,set_labels,set,
+def plot_model_pred(model,fine_labels, model_name,features,set_labels,set,
                     X_data,true_data,wind_size,casebatch_len):
 
     model.eval()
