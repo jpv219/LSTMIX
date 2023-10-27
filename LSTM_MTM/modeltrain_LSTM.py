@@ -40,7 +40,7 @@ import ray.cloudpickle as raypickle
 
 fig_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/figs/'
 input_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/input_data/'
-trainedmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/svtrained_models/'
+trainedmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/trained_svmodels/'
 tuningmod_savepath = '/media/fl18/Elements/Hypertuning/'
 
 ## Plot setup
@@ -863,7 +863,7 @@ def main():
     # 'bi1','bi01pm','3drop',
     # 'b09','da01pm','da001', 'coarsepm']
 
-    svcases = ['Bi0001','Bi0002','Bi0004','Bi001','B07','clean','B09','B05','Bi1']
+        svcases = ['Bi0001','Bi0002','Bi0004','Bi001','B07','clean','B09','B05','Bi1']
 
         features = ['Number of drops', 'Interfacial Area']
 
