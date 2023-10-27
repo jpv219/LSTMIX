@@ -378,14 +378,23 @@ def input_data(svcases, features,smoothing_method):
     ipt.plot_inputdata(svcases,fine_labels,shaped_input)
 
     # smoothing data
-    smoothed_data = ipt.smoothing(shaped_input,smoothing_method,window_size=5,poly_order=3,lowess_frac=None)
+
+    window_size = smoothing_params[0]
+    poly_order = smoothing_params[1]
+    lowess_frac = smoothing_params[2]
+
+    smoothed_data = ipt.smoothing(shaped_input,smoothing_method,window_size,poly_order,lowess_frac)
 
     ipt.plot_smoothdata(shaped_input, smoothed_data,fine_labels, smoothing_method, svcases)
 
     ## saving input data 
 
+    save_dict = {'smoothed_data' : smoothed_data,
+                 'case_labels' : Allcases,
+                 'features' : features}
+
     with open(os.path.join(input_savepath,'inputdata.pkl'),'wb') as file:
-        pickle.dump(smoothed_data,file)
+        pickle.dump(save_dict,file)
 
 ##################################### WINDOWING FUN. #################################################
 
@@ -836,6 +845,19 @@ def main():
     steps_in, steps_out = 50, 50
     stride = 1
 
+    ## Smoothing parameters
+    smoothing_method = 'savgol'
+    window_size = 5 # needed for moveavg and savgol
+    poly_order = 3 # needed for savgol
+    lowess_frac = 0.03 #needed for lowess
+
+    smoothing_params = (window_size,poly_order,lowess_frac)
+
+    ## Re process raw data to swap cases between train, validation and test split sets. Order will depend on Allcases list and train/test fracs.
+    choice = input('Re-process raw data sets before windowing? (y/n) : ')
+
+    if choice.lower() == 'y':
+
     ## Cases to split and features to read from 
     # Allcases = ['b03','b06','bi001','bi01','da01','da1','b06pm','b09pm','bi001pm',
     # 'bi1','bi01pm','3drop',
@@ -843,7 +865,7 @@ def main():
 
     svcases = ['Bi0001','Bi0002','Bi0004','Bi001','B07','clean','B09','B05','Bi1']
 
-    features = ['Number of drops', 'Interfacial Area']
+        features = ['Number of drops', 'Interfacial Area']
 
     smoothing_method = 'savgol'
 
