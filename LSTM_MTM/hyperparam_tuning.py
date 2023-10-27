@@ -221,14 +221,14 @@ def main():
         'DMS': {
             'hidden_size': tune.choice([2 ** i for i in range(6, 9)]),
             'learning_rate': tune.choice([0.005,0.01]),
-            'batch_size': tune.choice(range(10, 40, 5)),
+            'batch_size': tune.choice(range(8, 44, 4)),
             'training_prediction': tune.choice(['none']),
             'tf_ratio': tune.choice([0]),
             'dynamic_tf': tune.choice(['False']),
-            'l1_lambda': tune.choice([0, 0.00001, 0.0001]),
-            'l2_lambda': tune.choice([0, 0.00001, 0.0001]),
-            'batch_loss': tune.choice(['False']),
-            'penalty_weight': tune.choice([0.1,1,10])
+            'l1_lambda': tune.choice([0,0.00001]),
+            'l2_lambda': tune.choice([0,0.00001]),
+            'batch_loss': tune.choice(['True','False']),
+            'penalty_weight': tune.choice([0.01,0.1,1,10])
         },
         'S2S': {
             'hidden_size': tune.choice([2 ** i for i in range(6, 9)]),
@@ -266,7 +266,7 @@ def main():
 
     ray.shutdown()
     ray.init(num_cpus=num_cpus_to_allocate)
-    num_samples = 1800
+    num_samples = 1728
     log_file_path = os.path.join(tuningmod_savepath,model_choice,f'logs/{model_choice}_tune_out.log')
 
     # Run the experiment
