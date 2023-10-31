@@ -17,6 +17,7 @@ import os
 import pickle
 import random
 import math
+import re
 
 ## Env. variables ##
 
@@ -164,18 +165,83 @@ class DSD_processing():
             if value in bins[i]:
                 return i
         return -1
-    
-    def sort_into_bins(self,pre_dict,post_dict):
+   
+    def sort_into_bins(self,pre_dict):
         
         pre_dict, bins, bin_edges = self.gen_bins(pre_dict,closed='left')
         
-        #initialize n_bin key in each case dict in pre_dict
+        # Loop through all case dicts
         for case in self.cases:
-            for i in range(1,self.num_bins + 1):
-                pre_dict[case][f'b{i}'] = []
-        
+            # Initialize a dictionary for bin counts per timestep (size based on total times from len(predict))
+            bin_counts = {f'b{i}': [0] * len(pre_dict[case]['Vol']) for i in range(self.num_bins)}
+            
+            # Loop through volume arrays in each time j in each case
+            for j, d_vol_array in enumerate(pre_dict[case]['Vol']):
 
-class postprocess():
+                # Classify each drop volume into a given bin for timestep j
+                for drop in d_vol_array:
+                    bin_index = self.find_bin(drop, bins)
+                    bin_counts[f'b{bin_index}'][j] += 1 # store the bin count at each time j
+            
+            # Assign the counts to pre_dict[case]
+            for key, value in bin_counts.items():
+                pre_dict[case][key] = value
+
+        return pre_dict, bins, bin_edges
+    
+    def density_func_est(self,bin_edges, pre_dict, leftmost, rightmost, cases):
+        '''
+        Transform the drop counts into probabilities
+        Input: pre_dict containing dictionaries per case
+        leftmost: smallest bin number
+        rightmost: largest bin number
+        output: pre_dict with bins replaced for density fun estimates
+        '''
+
+        ## Extract the bin_width
+        bin_width = np.diff(bin_edges[leftmost:rightmost+1])[-1]
+
+        ## filtering out bins in all cases based on left/rightmost bin values and carrying out density fun estimation per case for all bins
+        for case in cases:
+            prob_dens = []
+            cum_dens = []
+            norm_dens = []
+
+            bins_kept = []
+            bins_to_delete = []
+            i=0
+
+            for key in pre_dict[case].keys():
+                ## targeting only keys corresponding to bins
+                if key.startswith('b'):
+                    bin_number = int(key[1:])  # Extract the number after 'b'
+
+                    ## deleting bins based on left/rightmost filters
+                    if bin_number < leftmost or bin_number > rightmost:
+                        bins_to_delete.append(key)
+                    ## Keep the rest of the bins and calculate prob and cumulative density for that given bin
+                    else:
+                        bins_kept.append(key)
+                        prob_dens.append(np.where(pre_dict[case]['Nd']>0, pre_dict[case][key]/pre_dict[case]['Nd']*bin_width,0))
+                        cum_dens.append(np.sum(prob_dens[i],axis=-1))
+                        i+=1
+
+            ## Go through each prob density and normalize it
+            for j in range (len(prob_dens)):
+                arr = np.where(cum_dens[j]>0, prob_dens[j] / cum_dens[j], 0)
+                norm_dens.append(arr)
+
+            ## re-write bin drop counts with norm density values
+            for i, key in enumerate(bins_kept):
+                pre_dict[case][key] = norm_dens[i]
+
+            ## filter out bins
+            for key in bins_to_delete:
+                del pre_dict[case][key]
+
+        return pre_dict
+
+class Post_processing():
 
     def __init__(self,cases,norm_columns,feature_map) -> None:
         self.cases = cases
@@ -350,8 +416,10 @@ def main():
     'bi1','bi01pm','3drop',
     'b09','da01pm','da001', 'coarsepm']
 
+    # Randomizing cases for different train-test set splitting
     cases = random.sample(Allcases,len(Allcases))
 
+    # List of features to be normalized (without DSD)
     feature_map = {'Number of drops': 'Nd',
                    'Interfacial Area': 'IA'
                    }
@@ -360,22 +428,34 @@ def main():
     ## raw data pre-processing, extracting and sorting from csv files
     rd_processor = RawData_processing(cases=cases)
 
+    ## post dict empty with case slots built in
     pre_dict,post_dict = rd_processor.sort_inputdata()
 
     DSD_choice = input('Include DSD in LSTM predictions? (y/n): ')
 
-    # List of features to be normalized
+    ## Including DSD data for LSTM prediction: pre-process and data preparation
     if DSD_choice.lower() == 'y':
-        n_bins = 20
+        n_bins = 12
         
         ## building features to represent all DSD bins
-        for i in range(1,n_bins+1):
+        for i in range(0,n_bins):
             key = f'DSD_bin_{i}'
             norm_columns.append(key)
-            feature_map[key] = f'b{i}' 
+            feature_map[key] = f'b{i}'
+        
+        ## DSD processing class
+        DSD_processor = DSD_processing(cases=cases, num_bins=n_bins)
+
+        ## Pre_dict with bins and drop counts assigned
+        pre_dict, _, bin_edges = DSD_processor.sort_into_bins(pre_dict)
+
+        pre_dict = DSD_processor.density_func_est(bin_edges,pre_dict,1,11,cases)
+
+    post_processor = Post_processing(cases=cases,
+                                     norm_columns=norm_columns,feature_map=feature_map)
 
     # scaled input data 
-    post_dict = scale_inputs(cases,norm_columns,feature_map)
+    post_dict = post_processor.scale_inputs(cases,pre_dict,post_dict)
 
     # re-shaped input data
     shaped_input = shape_inputdata(post_dict)
