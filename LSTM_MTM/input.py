@@ -17,7 +17,7 @@ import os
 import pickle
 import random
 import math
-import re
+import copy
 
 ## Env. variables ##
 
@@ -187,29 +187,16 @@ class DSD_processing():
             for key, value in bin_counts.items():
                 pre_dict[case][key] = value
 
-        return pre_dict, bins, bin_edges
-    
-    def density_func_est(self,bin_edges, pre_dict, leftmost, rightmost, cases):
-        '''
-        Transform the drop counts into probabilities
-        Input: pre_dict containing dictionaries per case
-        leftmost: smallest bin number
-        rightmost: largest bin number
-        output: pre_dict with bins replaced for density fun estimates
-        '''
+        return pre_dict, bin_edges
+
+    def filter_bins(self,bin_edges, pre_dict, leftmost, rightmost):
 
         ## Extract the bin_width
         bin_width = np.diff(bin_edges[leftmost:rightmost+1])[-1]
 
-        ## filtering out bins in all cases based on left/rightmost bin values and carrying out density fun estimation per case for all bins
-        for case in cases:
-            prob_dens = []
-            cum_dens = []
-            norm_dens = []
-
+        for case in self.cases:
             bins_kept = []
             bins_to_delete = []
-            i=0
 
             for key in pre_dict[case].keys():
                 ## targeting only keys corresponding to bins
@@ -219,34 +206,88 @@ class DSD_processing():
                     ## deleting bins based on left/rightmost filters
                     if bin_number < leftmost or bin_number > rightmost:
                         bins_to_delete.append(key)
-                    ## Keep the rest of the bins and calculate prob and cumulative density for that given bin
+                    ## Keep the rest of the bins
                     else:
                         bins_kept.append(key)
-                        prob_dens.append(np.where(pre_dict[case]['Nd']>0, pre_dict[case][key]/pre_dict[case]['Nd']*bin_width,0))
-                        cum_dens.append(np.sum(prob_dens[i],axis=-1))
-                        i+=1
-
-            ## Go through each prob density and normalize it
-            for j in range (len(prob_dens)):
-                arr = np.where(cum_dens[j]>0, prob_dens[j] / cum_dens[j], 0)
-                norm_dens.append(arr)
-
-            ## re-write bin drop counts with norm density values
-            for i, key in enumerate(bins_kept):
-                pre_dict[case][key] = norm_dens[i]
 
             ## filter out bins
             for key in bins_to_delete:
                 del pre_dict[case][key]
+        
+        return pre_dict,bin_width,bins_to_delete, bins_kept
 
-        return pre_dict
+    def density_func_est(self,f_pre_dict, bin_width, bins_kept):
+        '''
+        Transform the drop counts into probabilities
+        Input: pre_dict containing dictionaries per case
+        leftmost: smallest bin number
+        rightmost: largest bin number
+        output: pre_dict with bins replaced for density fun estimates
+        '''
+
+        ## Carrying out density fun estimation per case for all bins
+        for case in self.cases:
+            prob_dens = []
+            norm_dens = []
+
+            i=0
+
+            for key in f_pre_dict[case].keys():
+
+                ## targeting only keys corresponding to bins
+                if key.startswith('b'):
+                    ## calculate prob density estimation per bin: prob_dens is a list containing bin arrays.
+                    prob_dens.append(np.where(f_pre_dict[case]['Nd']>0, f_pre_dict[case][key]/f_pre_dict[case]['Nd']*bin_width,0))
+
+            ## Calculate cumulative density values for all bins per time: element-wise addition of all bins per time
+            cum_dens = np.zeros_like(prob_dens[0])
+            for arr in prob_dens:
+                cum_dens += arr
+
+            ## Go through each prob density bin array and normalize it
+            for j in range(len(prob_dens)):
+
+                arr = np.where(cum_dens>0, prob_dens[j] / cum_dens, 0)
+                norm_dens.append(arr)
+
+            for i, bin in enumerate(bins_kept):
+                ## re-write bin drop counts with norm density values
+                f_pre_dict[case][bin] = norm_dens[i]
+
+        return f_pre_dict
+
+    def plot_DSD(self,data,bin_edges,fine_labels):
+        
+        t_indices = [70, 80, 90, 100]
+        fig, axes = plt.subplots(2, 2, figsize=(12, 12))
+
+        for idx, t_idx in enumerate(t_indices):
+
+            row = idx // 2
+            col = idx % 2
+
+            for j, case in enumerate(self.cases):
+                label = fine_labels.get(case)
+
+                ax = axes[row, col]
+
+                ax.hist(bin_edges, bins=len(bin_edges), weights=data[t_idx, j, 2:].tolist(), label=f'{label}')
+                ax.set_ylabel('Drop count density function')
+                ax.set_xlabel(r'$Log_{10}(V/V_{cap})$')
+                ax.legend()
+                ax.set_title(f'DSD at time {t_idx*0.005} s')
+
+        plt.tight_layout()
+        plt.show()
 
 class Post_processing():
 
-    def __init__(self,cases,norm_columns,feature_map) -> None:
+    def __init__(self,cases,norm_columns,feature_map,DSD_choice:str,DSD_columns) -> None:
         self.cases = cases
         self.norm_columns = norm_columns
+        self.DSD_columns = DSD_columns
         self.feature_map = feature_map
+        self.DSD_choice = DSD_choice
 
     ## Normalize input data
     def scale_inputs(self,pre_dict,post_dict):
@@ -269,7 +310,15 @@ class Post_processing():
                 
                 # Transform and store the normalized data in the post_data dict. Post dict only holds dictionary with input variables per case
                 post_dict[case][mapped_column] = scaler.transform(norm_data).astype('float32')
-        
+            
+            ## if DSD is being processed, transfer bins into post_dict
+            if self.DSD_choice.lower() == 'y':
+
+                for col in self.DSD_columns:
+                    mapped_col = self.feature_map.get(col)
+                    post_dict[case][mapped_col] = norm_data_case[mapped_col].astype('float32')
+
+                
         return post_dict
 
     ## shape input to a suitable format for LSTM MTM architecture
@@ -277,24 +326,28 @@ class Post_processing():
     def shape_inputdata(self,post_dict):
 
         array = []
+        ## Extracting all keys to be processed from normalised features and filtered bins.
+        keys = [self.feature_map.get(feature) for feature in self.norm_columns+self.DSD_columns] 
 
         ### All cases must have the same number of data points for them to be used in LSTM
         min_length = min(len(data['IA']) for data in post_dict.values())
 
-        # Iterate through each case, output from items() is a tuple containing case and corresponding features
-        for case, features in post_dict.items():
-            # Extract the 'Nd' and 'IA' data for the current case
-            # Cases are truncated with the min length in order to be stacked as a nparray
-            Nd_data = features['Nd'][:min_length]
-            IA_data = features['IA'][:min_length]
+        # Iterate through each case
+        for case in self.cases:
+            case_data = []
+            #Iterate per feature per case
+            for key in keys:
+                # Cases are truncated with the min length in order to be stacked as a nparray
+                data = post_dict[case][key][:min_length]
+                case_data.append(data)
 
-            # Combine 'Nd_data' and 'IA_data' into a single numpy array per case, with each feature as a column. shape: rows, col =  timesteps ,features
-            combined_data = np.column_stack((Nd_data, IA_data))
+            # Combine all features per case into a single numpy array, with each feature as a column. shape: rows, col =  timesteps ,features
+            combined_data = np.column_stack(case_data)
             
             # Append each combined dataset (2D nparray) per case as an element in a list.
             array.append(combined_data)
 
-        # Re-shape array list as a 3D nparray, appending each case horizontally = stacking each case as a column, each column with 2 features 
+        # Re-shape array list as a 3D nparray, appending each case horizontally = stacking each case as a column, each column with n features 
         shaped_input = np.stack(array, axis=1)
         print('(time_step, num_case, num_feature)=', shaped_input.shape)
 
@@ -302,15 +355,17 @@ class Post_processing():
 
     ## smoothing function for shaped data
 
-    def smoothing(self,data, method, window_size=None, poly_order=None, lowess_frac = None):
+    def smoothing(self,in_data, method, window_size=None, poly_order=None, lowess_frac = None):
         '''
-        Input array : 2D array per feature, with shape (times, cases)
+        Input array : array with shape times,cases,features, smoothing only features 1,2 (ND,IA)
         Three methods to smooth:
         
         'moveavg': requires window_size
         'savgol': requires window_size, poly_order
         'lowess': requires lowess_frac
         '''
+
+        data = in_data[:,:,:2]
 
         ## rolling window averaging method
         if method == 'moveavg':
@@ -335,23 +390,28 @@ class Post_processing():
         else:
             raise ValueError('Unsupported smoothing method')
         
-        return smoothed_data
+        ## Locate range/interval of the smoothed columns
+        smoothed_columns = np.arange(smoothed_data.shape[-1])
+
+        # Reassign the smoothed columns to the original data
+        in_data[:, :, smoothed_columns] = smoothed_data
+
+        return in_data
 
     #### PLOTS ####
 
     def plot_inputdata(self,fine_labels, data,dpi=150):
         ### looping over the number of features (Nd and IA)
 
-        features = ['Number of drops', 'Interfacial Area']
         colors = sns.color_palette("husl", len(self.cases))
 
         # Create a single figure with multiple subplots
         fig, axes = plt.subplots(1,2, figsize=(12, 8), dpi=dpi, num=1)
 
         for i, ax in enumerate(axes):
-            ax.set_title(f'{features[i]}')
+            ax.set_title(f'{self.norm_columns[i]}')
             ax.set_xlabel('Time steps')
-            ax.set_ylabel(f'Scaled {features[i]}')
+            ax.set_ylabel(f'Scaled {self.norm_columns[i]}')
 
             for spine in ax.spines.values():
                 spine.set_linewidth(1.5)
@@ -363,7 +423,7 @@ class Post_processing():
                 ax.tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', length=5, width=1.5)
                 ax.grid(color='k', linestyle=':', linewidth=0.1)
 
-        fig.suptitle(f'Input data: {features}', fontsize=18)
+        fig.suptitle(f'Input data: {self.norm_columns}', fontsize=18)
         axes[0].legend(loc='upper left', bbox_to_anchor=(0.0, 1.0), ncol=2,fontsize='xx-small')
 
         plt.tight_layout()
@@ -424,12 +484,17 @@ def main():
                    'Interfacial Area': 'IA'
                    }
     norm_columns = ['Number of drops', 'Interfacial Area']
+    DSD_columns = []
 
-    ## raw data pre-processing, extracting and sorting from csv files
+    ######## RAW DATA PROCESSING ######
+
+   ## raw data pre-processing, extracting and sorting from csv files
     rd_processor = RawData_processing(cases=cases)
 
     ## post dict empty with case slots built in
     pre_dict,post_dict = rd_processor.sort_inputdata()
+
+    ######## DSD DATA PROCESSING ######
 
     DSD_choice = input('Include DSD in LSTM predictions? (y/n): ')
 
@@ -439,43 +504,75 @@ def main():
         
         ## building features to represent all DSD bins
         for i in range(0,n_bins):
-            key = f'DSD_bin_{i}'
-            norm_columns.append(key)
-            feature_map[key] = f'b{i}'
+            key = f'b{i}'
+            DSD_columns.append(key)
+            feature_map[key] = key
         
         ## DSD processing class
         DSD_processor = DSD_processing(cases=cases, num_bins=n_bins)
+        leftmost=1
+        rightmost=10
 
-        ## Pre_dict with bins and drop counts assigned
-        pre_dict, _, bin_edges = DSD_processor.sort_into_bins(pre_dict)
+        ## Pre_dict with bins and drop counts assigned: dc - dropcounts
+        pre_dict_dc, bin_edges = DSD_processor.sort_into_bins(pre_dict)
 
-        pre_dict = DSD_processor.density_func_est(bin_edges,pre_dict,1,11,cases)
+        ## Filter bins based on left/right most limits
+        pre_dict_dc, bin_width, bins_to_delete, bins_kept = DSD_processor.filter_bins(bin_edges,pre_dict_dc,leftmost,rightmost)
+
+        ## Save a copy of pre_dict with only drop counts
+        dc_copy = copy.deepcopy(pre_dict_dc)
+
+        ## Convert bin drop counts into probability density function values
+        pre_dict = DSD_processor.density_func_est(pre_dict_dc,bin_width, bins_kept)
+
+        ## delete bins filtered out from original bin list
+        DSD_columns = [item for item in DSD_columns if item not in bins_to_delete]
+        bin_edges = bin_edges[leftmost:rightmost+1]
+
+    ######## POST-PROCESSING ######
 
     post_processor = Post_processing(cases=cases,
-                                     norm_columns=norm_columns,feature_map=feature_map)
+                    norm_columns=norm_columns,feature_map=feature_map,
+                    DSD_choice=DSD_choice,DSD_columns=DSD_columns)
 
-    # scaled input data 
-    post_dict = post_processor.scale_inputs(cases,pre_dict,post_dict)
+    # scaled input data, in case of DSD: include processed bins into post_dict
+    post_dict = post_processor.scale_inputs(pre_dict,post_dict)
 
     # re-shaped input data
-    shaped_input = shape_inputdata(post_dict)
+    shaped_input = post_processor.shape_inputdata(post_dict)
+
+    ##### DSD PLOTTING #####
+
+    if DSD_choice.lower() == 'y':
+
+        ## reshape pre_dict with bins into numpy array for handling and plotting
+        shaped_data_dc = post_processor.shape_inputdata(dc_copy)
+
+        ## plot drop count histogram
+        DSD_processor.plot_DSD(shaped_data_dc,bin_edges,fine_labels)
+        ##plot density function histogram
+        DSD_processor.plot_DSD(shaped_input,bin_edges,fine_labels)
+
+    #### DATA SMOOTHING AND SAVING
 
     #plotting
-    plot_inputdata(cases,fine_labels,shaped_input)
+    post_processor.plot_inputdata(fine_labels,shaped_input)
 
     # smoothing data
-    smoothed_data = smoothing(shaped_input,'savgol',window_size=5,poly_order=3)
+    smoothed_data = post_processor.smoothing(shaped_input,'savgol',window_size=5,poly_order=3)
 
-    plot_smoothdata(shaped_input, smoothed_data,fine_labels, 'savgol', cases)
+    post_processor.plot_smoothdata(shaped_input, smoothed_data,fine_labels, 'savgol')
 
     ## saving input data 
 
     save_dict = {'smoothed_data' : smoothed_data,
                  'case_labels' : cases,
-                 'features' : norm_columns}
+                 'features' : norm_columns+DSD_columns}
 
     with open(os.path.join(input_savepath,'inputdata.pkl'),'wb') as file:
         pickle.dump(save_dict,file)
+
+    print(f'Input data processed and saved to {input_savepath}')
 
 if __name__ == "__main__":
     main()
