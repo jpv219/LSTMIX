@@ -119,29 +119,61 @@ class Window_data():
             
             case_labels = train_cases if label == "Training" else val_cases if label == "Validation" else test_cases
 
-            fig, ax = plt.subplots(1, 2, figsize=(12, 5))
-            color_palette = color_palettes[label]
-          
-            for axis in ax:
-                for spine in axis.spines.values():
-                    spine.set_linewidth(1.5)
+            if len(features) > 1:
+                fig, ax = plt.subplots(1, 2, figsize=(12, 5))
+                color_palette = color_palettes[label]
+            
+                for axis in ax:
+                    for spine in axis.spines.values():
+                        spine.set_linewidth(1.5)
 
-            ## Looping per feature number in each split set
-            for i in range(data.shape[-1]):
+                ## Looping per feature number in each split set
+                for i in range(data.shape[-1]):
 
-                for case, idx in zip(case_labels, range(len(case_labels))):
+                    for idx, case in enumerate(case_labels):
 
-                    plot_label = fine_labels.get(case,case)
-                    ax[i].plot(split_set[:,idx,i],label = f'{plot_label}',color=color_palette[idx % len(color_palette)])
-                    ax[i].set_title(f'{label}: {features[i]}')
-                    ax[i].set_xlabel('Time steps')
-                    ax[i].set_ylabel(f'Scaled {features[i]}')
-                    ax[i].tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', length=5, width=1.5)
-                    ax[i].grid(color='k', linestyle=':', linewidth=0.1)
-                    ax[i].legend()
+                        plot_label = fine_labels.get(case,case)
+                        ax[i].plot(split_set[:,idx,i],label = f'{plot_label}',color=color_palette[idx % len(color_palette)])
+                        ax[i].set_title(f'{label}: {features[i]}')
+                        ax[i].set_xlabel('Time steps')
+                        ax[i].set_ylabel(f'Scaled {features[i]}')
+                        ax[i].tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', length=5, width=1.5)
+                        ax[i].grid(color='k', linestyle=':', linewidth=0.1)
+                        ax[i].legend()
+                ## saving figures
+                fig.savefig(os.path.join(fig_savepath, f'{label}_data_{features[i]}.png'), dpi=dpi)
+            
+            else:
+                # data shape here (times, cases, bin_index)
+                bin_idxs = data.shape[-1]
+                fig,axes = plt.subplots(2,int(bin_idxs/2), figsize=(int(bin_idxs/2*5),5))
+                fig.tight_layout(rect=[0.05,0.02,1,0.9]) # [left, bottom, right, top]
+                fig.subplots_adjust(wspace=0.2)
+                color_palette = color_palettes[label]
 
-            ## saving figures
-            fig.savefig(os.path.join(fig_savepath, f'{label}_data_{features[i]}.png'), dpi=dpi)
+                # for axis in axes:
+                #     for spine in axis.spines.values():
+                #         spine.set_linewidth(1.5)
+                for i in range(bin_idxs):
+                    for idx, case in enumerate(case_labels):
+                        plot_label = fine_labels.get(case,case)
+                        row = i // int(bin_idxs/2)  # Calculate the row for the subplot
+                        col = i % int(bin_idxs/2)  # Calculate the column for the subplot
+                        ax = axes[row, col]
+
+                        ax.plot(split_set[:,idx,i],label = f'{plot_label}',color=color_palette[idx % len(color_palette)],linewidth = 2.5)
+                        ax.set_title(f'{label}: Range {i+1}',fontweight='bold', fontsize=25)
+                        # ax.set_xlabel('Time steps')
+                        # ax.set_ylabel(f'{features[0]}')
+                        ax.tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', length=5, width=1.5)
+                        ax.grid(color='k', linestyle=':', linewidth=0.1)
+                        axes[0,0].legend()
+                
+                fig.supxlabel('Time steps',fontweight='bold',fontsize=30)
+                fig.supylabel(f'{features[0]}',fontweight='bold',fontsize=30)
+                fig.suptitle('Estimated density of Drop counts in drop size ranges',fontsize=40,fontweight='bold')
+                ## saving figures
+                fig.savefig(os.path.join(fig_savepath, f'{label}_data_{features[0]}_0.png'), dpi=dpi)
 
             plt.show()
 
@@ -402,9 +434,8 @@ def windowing(steps_in,steps_out,stride,train_frac,test_frac,svcases, features):
     ])
 
     # Reading saved re-shaped input data from file
-    with open(os.path.join(input_savepath,'svinputdata.pkl'), 'rb') as file:
+    with open(os.path.join(input_savepath,'svinputdataDSD_0.pkl'), 'rb') as file:
         input_df = pickle.load(file)
-    
 
     train_arr, val_arr, test_arr, splitset_labels = windowing.split_cases(
         input_df, train_frac, test_frac, svcases)
@@ -506,7 +537,7 @@ def saving_data(wd,hp,model_choice,save_hp=True):
 
 def train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler,
                   num_epochs, check_epochs, 
-                  X_train, y_train, X_val, y_val, saveas,
+                  X_train, y_train, X_val, y_val,saveas,
                   batch_loss = False,tuning=False):
     
     model_name = 'DMS'
@@ -535,7 +566,7 @@ def train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler,
             
             first_iteration = True
             for X_batch, y_batch in trainloader:
-                
+
                 optimizer.zero_grad() # setting gradients to zero to start a new run on weight optimisation (clear accumulated from previous batch)
 
                 # Forward pass
@@ -676,7 +707,7 @@ def train_S2S(model, optimizer, loss_fn, trainloader,valloader,scheduler, num_ep
             first_iteration = True
 
             for X_batch, y_batch in trainloader:
-
+                X_batch, y_batch = X_batch, y_batch
                 # initializing output tensor
                 outputs = torch.zeros(X_batch.shape[0], pred_steps, X_batch.shape[2]) #shape = (batch_size,steps_out,num_features)
 
@@ -842,13 +873,13 @@ def main():
     # 'bi1','bi01pm','3drop',
     # 'b09','da01pm','da001', 'coarsepm']
 
-    svcases = ['Bi0001','Bi0002','Bi001','B07','clean','Bi1','Bi0004','B09','B05']
+    svcases = ['Bi0001','Bi0004','Bi001','B05','B07','clean','B09','Bi1','Bi0002']
 
-    features = ['Number of drops', 'Interfacial Area']
+    features = ['Estimated Density of drop counts in one bin']#['Number of drops', 'Interfacial Area']
 
     smoothing_method = 'lowess'
 
-    input_data(svcases,features,smoothing_method)
+    # input_data(svcases,features,smoothing_method)
 
     ## data splitting for training, validating and testing
     train_frac = 0.7
@@ -856,83 +887,92 @@ def main():
 
     windowed_data = windowing(steps_in,steps_out,stride,train_frac, test_frac, svcases,features)
 
-    ## Extracting from named tuple
-    X_train = windowed_data.X_train.to(torch.float32)
-    y_train = windowed_data.y_train.to(torch.float32)
-    X_val = windowed_data.X_val.to(torch.float32)
-    y_val = windowed_data.y_val.to(torch.float32)
+    # ## Extracting from named tuple
+    # X_train = windowed_data.X_train.to(torch.float32)
+    # y_train = windowed_data.y_train.to(torch.float32)
+    # X_val = windowed_data.X_val.to(torch.float32)
+    # y_val = windowed_data.y_val.to(torch.float32)
 
-    ######### LSTM MODEL TRAINING ##########
-
-    # Define hyperparameters
-    input_size = X_train.shape[-1]  # Number of features in the input tensor
-    hidden_size = 128  # Number of hidden units in the LSTM cell, determines how many weights will be used in the hidden state calculations
-    output_size = y_train.shape[-1]  # Number of output features, same as input in this case
-    pred_steps = steps_out # Number of future steps to predict
-    batch_size = 30 # How many windows are being processed per pass through the LSTM
-    learning_rate = 0.005
-    num_epochs = 2000
-    check_epochs = 100
-
-    tf_ratio = 0.1
-    dynamic_tf = True
-
-    # customize loss function 
-    penalty_weight = 10
-    loss_fn = custom_loss(penalty_weight)
-    trainloader = data.DataLoader(data.TensorDataset(X_train, y_train), shuffle=True, batch_size=batch_size)
-    valloader = data.DataLoader(data.TensorDataset(X_val, y_val), shuffle=True, batch_size=batch_size)
-        
-    ## Calling model class instance and training function
-    model_choice = input('Select a LSTM model to train (DMS, S2S): ')
-
-    if model_choice == 'DMS':
-        # LSTM model instance
-        model = LSTM_DMS(input_size, hidden_size, output_size, pred_steps,
-                            l1_lambda=0.00, l2_lambda=0.00)
-        
-        optimizer = optim.Adam(model.parameters(), lr = learning_rate) # optimizer to estimate weights and biases (backpropagation)
-            
-        # Learning rate scheduler, set on min mode to decrease by factor when validation loss stops decreasing                                       
-        scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=True)
-        
-        train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler, 
-            num_epochs, check_epochs, X_train, y_train, X_val, 
-            y_val,saveas='DMS_out',batch_loss=False)
-        
-    elif model_choice == 'S2S':
-        # LSTM model instance
-        model = LSTM_S2S(input_size, hidden_size, output_size, pred_steps,
-                         l1_lambda=0.00, l2_lambda=0.00)
-        
-        optimizer = optim.Adam(model.parameters(), lr = learning_rate) # optimizer to estimate weights and biases (backpropagation)
-        
-        # Learning rate scheduler, set on min mode to decrease by factor when validation loss stops decreasing                                       
-        scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=True)
-        
-        train_S2S(model,optimizer, loss_fn, trainloader, valloader, scheduler, num_epochs, 
-                  check_epochs,pred_steps,X_train,y_train, X_val, y_val,
-                  tf_ratio, dynamic_tf, training_prediction= 'mixed',
-                  saveas='S2S_out',batch_loss=False)
-
-    else:
-        raise ValueError('Model selected is not configured/does not exist. Double check input.')
-
-    ######## SAVING ALL RELEVANT DATA ########
-
-    ## namedtuple used to store all hyperparams and send as a single arg to save_func
-    HyperParams = namedtuple('HyperParams', [
-    'input_size', 'hidden_size', 'output_size',
-    'pred_steps', 'batch_size', 'learning_rate',
-    'num_epochs', 'check_epochs', 'steps_in', 'steps_out', 'tf_ratio', 'dynamic_tf'
-        ])
+    # ######### LSTM MODEL TRAINING ##########
     
-    hyper_params = HyperParams(input_size=input_size, hidden_size=hidden_size, output_size=output_size,
-    pred_steps=pred_steps, batch_size=batch_size, learning_rate=learning_rate, num_epochs=num_epochs,
-    check_epochs=check_epochs, steps_in=steps_in, steps_out=steps_out, tf_ratio=tf_ratio, dynamic_tf=dynamic_tf
-    )
+    # # check if GPU is available
+    # if torch.cuda.is_available():
+    #     device = torch.device("cuda")
+    #     print("Training is now on CUDA.")
+    # else:
+    #     device = torch.device("cpu") 
 
-    saving_data(windowed_data,hyper_params,model_choice)
+    # # Define hyperparameters
+    # input_size = X_train.shape[-1]  # Number of features in the input tensor
+    # hidden_size = 128  # Number of hidden units in the LSTM cell, determines how many weights will be used in the hidden state calculations
+    # output_size = y_train.shape[-1]  # Number of output features, same as input in this case
+    # pred_steps = steps_out # Number of future steps to predict
+    # batch_size = 30 # How many windows are being processed per pass through the LSTM
+    # learning_rate = 0.005
+    # num_epochs = 2000
+    # check_epochs = 100
+
+    # tf_ratio = 0.1
+    # dynamic_tf = True
+
+    # # customize loss function 
+    # penalty_weight = 10
+    # loss_fn = custom_loss(penalty_weight)
+    # trainloader = data.DataLoader(data.TensorDataset(X_train, y_train), shuffle=True, batch_size=batch_size)
+    # valloader = data.DataLoader(data.TensorDataset(X_val, y_val), shuffle=True, batch_size=batch_size)
+        
+    # ## Calling model class instance and training function
+    # model_choice = input('Select a LSTM model to train (DMS, S2S): ')
+
+    # if model_choice == 'DMS':
+    #     # LSTM model instance
+    #     model = LSTM_DMS(input_size, hidden_size, output_size, pred_steps,
+    #                         l1_lambda=0.00, l2_lambda=0.00)
+        
+        
+    #     optimizer = optim.Adam(model.parameters(), lr = learning_rate) # optimizer to estimate weights and biases (backpropagation)
+            
+    #     # Learning rate scheduler, set on min mode to decrease by factor when validation loss stops decreasing                                       
+    #     scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=True)
+        
+    #     train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler, 
+    #         num_epochs, check_epochs, X_train, y_train, X_val, 
+    #         y_val,device=device,saveas='DMS_out',batch_loss=False)
+        
+    # elif model_choice == 'S2S':
+    #     # LSTM model instance
+    #     model = LSTM_S2S(input_size, hidden_size, output_size, pred_steps,
+    #                      l1_lambda=0.00, l2_lambda=0.00)
+    
+        
+    #     optimizer = optim.Adam(model.parameters(), lr = learning_rate) # optimizer to estimate weights and biases (backpropagation)
+        
+    #     # Learning rate scheduler, set on min mode to decrease by factor when validation loss stops decreasing                                       
+    #     scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=True)
+        
+    #     train_S2S(model,optimizer, loss_fn, trainloader, valloader, scheduler, num_epochs, 
+    #               check_epochs,pred_steps,X_train,y_train, X_val, y_val,
+    #               tf_ratio, dynamic_tf, training_prediction= 'mixed',device=device,
+    #               saveas='S2S_out',batch_loss=False)
+
+    # else:
+    #     raise ValueError('Model selected is not configured/does not exist. Double check input.')
+
+    # ######## SAVING ALL RELEVANT DATA ########
+
+    # ## namedtuple used to store all hyperparams and send as a single arg to save_func
+    # HyperParams = namedtuple('HyperParams', [
+    # 'input_size', 'hidden_size', 'output_size',
+    # 'pred_steps', 'batch_size', 'learning_rate',
+    # 'num_epochs', 'check_epochs', 'steps_in', 'steps_out', 'tf_ratio', 'dynamic_tf'
+    #     ])
+    
+    # hyper_params = HyperParams(input_size=input_size, hidden_size=hidden_size, output_size=output_size,
+    # pred_steps=pred_steps, batch_size=batch_size, learning_rate=learning_rate, num_epochs=num_epochs,
+    # check_epochs=check_epochs, steps_in=steps_in, steps_out=steps_out, tf_ratio=tf_ratio, dynamic_tf=dynamic_tf
+    # )
+
+    # saving_data(windowed_data,hyper_params,model_choice)
 
 if __name__ == "__main__":
     main()

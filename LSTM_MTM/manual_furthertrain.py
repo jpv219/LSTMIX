@@ -286,11 +286,11 @@ def main():
     best_model_path = os.path.join(tuningmod_savepath,f'best_models/{model_choice}')
 
     # shutil.copy(f'{best_chkpoint.path}/chk_dict.pkl',best_model_path)
-    best_trial_config = {'hidden_size': 256, 'learning_rate': 0.005, 'batch_size': 20, 'training_prediction': 'none', 'tf_ratio': 0, 
-                         'dynamic_tf': 'False', 'l1_lambda': 1e-05, 'l2_lambda': 1e-05, 'batch_loss': 'True', 'penalty_weight': 1}
+    best_trial_config = {'hidden_size': 128, 'learning_rate': 0.005, 'batch_size': 20, 'training_prediction': 'mixed', 'tf_ratio': 0.4, 
+                         'dynamic_tf': 'True', 'l1_lambda': 0, 'l2_lambda': 0, 'batch_loss': 'False', 'penalty_weight': 0.1}
     # {'hidden_size': 64, 'learning_rate': 0.005, 'batch_size': 10, 'training_prediction': 'mixed', 'tf_ratio': 0.02, 
                         #  'dynamic_tf': 'True', 'l1_lambda': 0.0001, 'l2_lambda': 0.0001, 'batch_loss': 'False', 'penalty_weight': 10}
-    best_chkpoint_path = '/media/fl18/Elements/Hypertuning/DMS/train_tune_2023-10-24_13-41-03/train_tune_97b84_00026_26_batch_loss=True,batch_size=20,dynamic_tf=False,hidden_size=256,l1_lambda=0.0000,l2_lambda=0.0000,learnin_2023-10-24_13-44-34/checkpoint_000004'
+    best_chkpoint_path = '/media/fl18/Elements/Hypertuning/S2S/train_tune_2023-10-28_22-26-18/train_tune_a1e44_00395_395_batch_loss=False,batch_size=20,dynamic_tf=True,hidden_size=128,l1_lambda=0,l2_lambda=0,learning_rate=0._2023-10-29_23-55-32/checkpoint_000004'
 
     with open(f'{best_model_path}/config_{model_choice}.pkl', 'wb') as pickle_file:
 

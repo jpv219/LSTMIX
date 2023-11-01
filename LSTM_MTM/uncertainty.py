@@ -17,7 +17,7 @@ import numpy as np
 from sklearn.metrics import r2_score
 
 fig_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/figs/'
-trainedmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/trained_svmodels/'
+trainedmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/trained_svALLmodels_0/'
 
 ## Plot setup
 
@@ -68,6 +68,32 @@ def perturbation(num_pertb, pertb_scale, input_seq):
         
     return pertb_seqs
 
+# Function to calculate uncertainty from perturbed input
+def uncertainty_norm(pertb_preds):
+    '''
+    calculate uncertainty of the trained model: perturbation scale based on normal distribution
+    
+    : input pertb_preds: list of prediction from perturbed sequence; 
+                         (num_pertb, 1, steps_in*num_forward, num_features)
+    : return arrays of mean, std, lower bound and upper bound for prediction intervals; 
+                         (steps_in*num_forward, num_features)
+    '''
+    # convert the list of torch tensors into np.array for mean and std calculation
+    pertb_preds = [t[0,:,:] for t in pertb_preds]
+    pertb_preds = np.array([t.numpy() for t in pertb_preds])
+    print('shape of perturbed prediction array: ', pertb_preds.shape)
+    
+    # Calculate mean and standard deviation across the samples for each time step
+    mean_preds = np.mean(pertb_preds, axis=0)
+    std_preds = np.std(pertb_preds, axis=0)
+
+    # Optionally, can calculate prediction intervals
+    confi_int = 1.96 # For a 95% confidence interval corresponding to standard normal distribution
+    lower_bound = mean_preds - confi_int * std_preds
+    upper_bound = mean_preds + confi_int * std_preds
+    
+#     print('mean and std shape: ', mean_preds.shape, std_preds.shape)
+    return mean_preds, lower_bound, upper_bound
 
 # Function to calculate uncertainty form perturbed input
 def uncertainty_uni(pertb_preds):
@@ -96,7 +122,7 @@ def uncertainty_uni(pertb_preds):
 
 ##################################### PLOTTING FUNC. ########################################
 # Function to plot predictions from perturbed input emsemble
-def plot_ensem_pred(model_name,features,scale,c_idx,
+def plot_ensem_pred(model_name,features,scale,
                     rollout_ref,true_data,rollouts_pertb):
 
     num_features = len(features) #Nd and IA
@@ -108,12 +134,12 @@ def plot_ensem_pred(model_name,features,scale,c_idx,
         plot target, predictions from original input, predictions from perturbed.
         '''
 
-        r2 = r2_score(true_data[:,c_idx,f_idx],rollout_ref[c_idx,:,f_idx][:true_data.shape[0]])
+        r2 = r2_score(true_data[:,0,f_idx],rollout_ref[0,:,f_idx][:true_data.shape[0]])
         
-        plt.plot(true_data[:,c_idx,f_idx], linewidth = 3, label=r'Target')
-        plt.plot(rollout_ref[c_idx,:,f_idx], '--', linewidth = 3, label=r'Ref rollout')
+        plt.plot(true_data[:,0,f_idx], linewidth = 3, label=r'Target')
+        plt.plot(rollout_ref[0,:,f_idx], '--', linewidth = 3, label=r'Ref rollout')
         for i in range(len(rollouts_pertb)):
-            plt.plot(rollouts_pertb[i][c_idx,:,f_idx], ':')
+            plt.plot(rollouts_pertb[i][0,:,f_idx], ':')
                     #  's',markersize=5,
                     #  alpha=0.8,markeredgewidth=1.5, markeredgecolor='k',markevery=5,
                     #  lw=0.0)
@@ -130,7 +156,7 @@ def plot_ensem_pred(model_name,features,scale,c_idx,
         plt.show()
 
 # Function to plot uncertainty from perturbed rollout sequence
-def plot_ensem_uncertainty(model_name,features,scale,c_idx,
+def plot_ensem_uncertainty(model_name,features,scale,
                     rollout_ref,true_data,rollouts_pertb_mean,lower_bound,upper_bound):
     
     num_features = len(features) #Nd and IA
@@ -141,8 +167,8 @@ def plot_ensem_uncertainty(model_name,features,scale,c_idx,
         plot target, original prediction, mean prediction, prediction interval
         '''
         fig = plt.figure(figsize=(12,6))
-        plt.plot(true_data[:,c_idx,f_idx], color='tab:blue', lw=3, label=r'Target')
-        plt.plot(rollout_ref[c_idx,:,f_idx], color='tab:orange', linestyle='--', lw=3, label=r'Ref rollout')
+        plt.plot(true_data[:,0,f_idx], color='tab:blue', lw=3, label=r'Target')
+        plt.plot(rollout_ref[0,:,f_idx], color='tab:orange', linestyle='--', lw=3, label=r'Ref rollout')
         plt.plot(rollouts_pertb_mean[:, f_idx], 's',markersize=5,markerfacecolor='tab:red',
                      alpha=0.8,markeredgewidth=1.5, markeredgecolor='k',markevery=5,
                      lw=0.0, label=r'Mean perturbed rollout')
@@ -162,10 +188,22 @@ def plot_ensem_uncertainty(model_name,features,scale,c_idx,
         fig.savefig(os.path.join(fig_savepath, f'Uncertainty_rollout_{model_name}_{features[f_idx]}.png'), dpi=150)
         plt.show()
 
+def plot_residuals(model_name,features,residuals_origin,scale,steps_in,pertb_perd_intvs, count):
+    fig, ax = plt.subplots(1,2,figsize=(12,6))
+    for f_idx in range(len(features)):
+        ax[f_idx].plot(residuals_origin[steps_in:,f_idx],color='black',label=f'target residuals')
+        ax[f_idx].set_ylabel(f'Feature {f_idx+1}', fontsize=16)
+        
+        ax[f_idx].plot(pertb_perd_intvs[count][steps_in:,f_idx], '--', label=f'{scale:.3f}')
+        corrcoef = np.corrcoef(residuals_origin[steps_in:,f_idx], pertb_perd_intvs[count][steps_in:steps_in+335,f_idx])[0,1]
+
+    plt.legend(ncol=2)
+    fig.suptitle(f'Pearson\'s correlation coefficient between two residuals = {corrcoef:.4f}', fontsize=20)
+    fig.savefig(os.path.join(fig_savepath, f'Uncertainty_Residuals_{model_name}_{features[f_idx]}.png'), dpi=150)
+    plt.show()
+
 ########################################################################################
 def main():
-    
-    features = ['Number of drops', 'Interfacial Area']
 
     ## Select LSTM model trained to use for predictions and plots
     model_choice = input('Select a LSTM model to use for predictions (DMS, S2S): ')
@@ -208,7 +246,7 @@ def main():
     
     ##### PREDICTIONS #####
     num_pertb = 50 # number of perturbed sequences to generate
-    pertb_scales = [0.3] # scaling factor for perturbing the data
+    pertb_scales = [0.25] # scaling factor for perturbing the data
     
     wind_size = hyperparams["steps_in"] + hyperparams["steps_out"]
 
@@ -222,10 +260,17 @@ def main():
 
 
     ## Load the last best model before training degrades         
-    model.load_state_dict(torch.load(os.path.join(trainedmod_savepath,f'{model_choice}_trained_model.pt')))
+    model.load_state_dict(torch.load(os.path.join(trainedmod_savepath,f'{model_choice}_trained_model.pt'),map_location=torch.device('cpu')))
 
     ## carry out rollout predictions on testing data sets
     test_arr = arrays[2]
+
+    features = ['Number of drops', 'Interfacial Area']
+    if test_arr.shape[-1] == 2:
+        features = features
+    elif test_arr.shape[-1] > 2:
+        for i in range(2, test_arr.shape[-1]):
+                features.append(f'Range {i-1}')
 
     ## Extracting input steps from test data, keeping all cases and features in shape (in_steps,cases,features)
     c_idx = 0 # the index for the test case for uncertainty estimation
@@ -237,10 +282,12 @@ def main():
 
     ## Calling rollout prediction for test data: prediction from input sequence
     rollout_ref = rollout(model,input_seq,hyperparams["steps_out"],total_steps)
+    ## calculate the residuals
+    residuals_origin = np.absolute(np.array(test_arr[:,0,:]) - np.array(rollout_ref[0,:,:][:test_arr.shape[0]]))
 
     ## Iteration: perturbed prediction from perturbed input sequences
     pertb_perd_intvs = []
-    for scale in pertb_scales:
+    for count, scale in enumerate(pertb_scales):
         # generate perturbed input sequence
         pertb_input = perturbation(num_pertb, scale, input_seq)
         
@@ -249,7 +296,7 @@ def main():
             pertb_pred = rollout(model, pertb_input[i],hyperparams["steps_out"],total_steps)
             rollouts_pertb.append(pertb_pred)
         
-        plot_ensem_pred(model_choice,features,scale,c_idx,rollout_ref,test_arr,rollouts_pertb)
+        plot_ensem_pred(model_choice,features[:3],scale,rollout_ref,test_arr,rollouts_pertb)
 
         # evaluate uncertainty
         mean, lb, ub = uncertainty_uni(rollouts_pertb)
@@ -257,7 +304,8 @@ def main():
         pertb_perd_intv = np.absolute(ub-lb)
         pertb_perd_intvs.append(pertb_perd_intv)
 
-        plot_ensem_uncertainty(model_choice,features,scale,c_idx,rollout_ref,test_arr,mean,lb,ub)
+        plot_ensem_uncertainty(model_choice,features[:3],scale,rollout_ref,test_arr,mean,lb,ub)
+        plot_residuals(model_choice,features[:3],residuals_origin,scale,hyperparams["steps_in"],pertb_perd_intvs,count)
 
 if __name__ == "__main__":
     main()
