@@ -11,8 +11,11 @@ import os
 import pickle
 
 ## env. variables 
-trainedmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/trained_models/'
-input_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/input_data/'
+#trainedmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/trained_models/'
+#input_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/input_data/'
+
+trainedmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/trained_models/'
+input_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/input_data/'
 
 
 ########################################### MAIN ###########################################
@@ -46,9 +49,13 @@ def main():
         # Random sampling
         cases = random.sample(Allcases,len(Allcases))
 
-        features = ['Number of drops', 'Interfacial Area']
+        # List of features to be normalized (without DSD)
+        feature_map = {'Number of drops': 'Nd',
+                    'Interfacial Area': 'IA'
+                    }
+        norm_columns = ['Number of drops', 'Interfacial Area']
 
-        trn.input_data(Allcases,features,smoothing_method,smoothing_params)
+        trn.input_data(Allcases,feature_map,norm_columns,smoothing_method,smoothing_params)
 
     # Reading saved re-shaped input data from file
     with open(os.path.join(input_savepath,'inputdata.pkl'), 'rb') as file:

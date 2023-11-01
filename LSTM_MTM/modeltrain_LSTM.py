@@ -17,9 +17,14 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.utils.data as data
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-from tools_modeltraining import custom_loss, EarlyStopping
-import input as ipt
 from collections import namedtuple
+
+
+from tools_modeltraining import custom_loss, EarlyStopping
+from input import Post_processing
+from input import RawData_processing
+from input import DSD_processing
+import input as ipt
 
 ## For tuning
 from ray import train
@@ -29,19 +34,19 @@ import ray.cloudpickle as raypickle
 
 ## Env. variables ##
 
-# fig_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/figs/'
-# input_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/input_data/'
-# trainedmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/trained_models/'
-# tuningmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/tuning/'
+fig_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/figs/'
+input_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/input_data/'
+trainedmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/trained_models/'
+tuningmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/tuning/'
 
 #fig_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/figs/'
 #input_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX//LSTM_MTM/input_data/'
 #trainedmod_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/trained_models'
 
-fig_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/figs/'
-input_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/input_data/'
-trainedmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/trained_models/'
-tuningmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/tuning/'
+#fig_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/figs/'
+#input_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/input_data/'
+#trainedmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/trained_models/'
+#tuningmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/tuning/'
 
 ## Plot setup
 
@@ -99,7 +104,7 @@ class Window_data():
         return train, val, test, (train_cases, val_cases, test_cases)
 
     ## plot split data sets   
-    def plot_split_cases(self, data, fine_labels, splitset_labels, train, val, test, 
+    def plot_split_cases(self, fine_labels, splitset_labels, train, val, test, 
                         features, case_labels, dpi=150):
 
         #Plot setup
@@ -127,7 +132,7 @@ class Window_data():
                     spine.set_linewidth(1.5)
 
             ## Looping per feature number in each split set
-            for i in range(data.shape[-1]):
+            for i in range(len(features)):
 
                 for case, idx in zip(case_labels, range(len(case_labels))):
 
@@ -144,6 +149,50 @@ class Window_data():
             fig.savefig(os.path.join(fig_savepath, f'{label}_data_{features[i]}.png'), dpi=dpi)
 
             plt.show()
+
+    def plot_split_DSD(self, fine_labels, splitset_labels, train, val, test, 
+                        case_labels, bin_edges, dpi=150):
+        
+        #Plot setup
+        color_palettes = {
+        "Training": sns.color_palette("Set1", len(case_labels)),
+        "Validation": sns.color_palette("Set2", len(case_labels)),
+        "Test": sns.color_palette("Set3", len(case_labels))
+    }
+        
+        train_cases = splitset_labels[0]
+        val_cases = splitset_labels[1]
+        test_cases = splitset_labels[2]
+
+        ## Looping over all three data sets
+        for split_set, label in zip([train, val, test], 
+                                    ['Training', 'Validation', 'Test']):
+            
+            case_labels = train_cases if label == "Training" else val_cases if label == "Validation" else test_cases
+
+            t_indices = [70, 80, 90, 100]
+            fig, axes = plt.subplots(2, 2, figsize=(12, 12))
+            color_palette = color_palettes[label]
+          
+            for axis in axes:
+                for spine in axis.spines.values():
+                    spine.set_linewidth(1.5)
+
+            for idx, t_idx in enumerate(t_indices):
+
+                row = idx // 2
+                col = idx % 2
+
+                for j, case in enumerate(case_labels):
+                    label = fine_labels.get(case)
+
+                    ax = axes[row, col]
+
+                    ax.hist(bin_edges, bins=len(bin_edges), weights=split_set[t_idx, j, 2:].tolist(), label=f'{label}', color=color_palette[j % len(color_palette)])
+                    ax.set_ylabel('Drop count density function')
+                    ax.set_xlabel(r'$Log_{10}(V/V_{cap})$')
+                    ax.legend()
+                    ax.set_title(f'DSD at time {t_idx*0.005} s')
 
     ## Generate windows from input data
     def window_data(self, df, steps_in, stride, steps_out):
@@ -366,16 +415,47 @@ class LSTM_S2S(nn.Module):
 
 ##################################### INPUT_DATA FUN. ################################################
 
-def input_data(Allcases, features,smoothing_method,smoothing_params):
- 
+def input_data(Allcases, feature_map,norm_columns,smoothing_method,smoothing_params):
+
+    DSD_columns = []
+
+    ###### RAW DATA PROCESSING #####
+    ipt_rp = RawData_processing(Allcases)
+
+    ## post dict empty with case slots built in
+    pre_dict,post_dict =ipt_rp.sort_inputdata()
+
+    ######## DSD DATA PROCESSING ######
+    DSD_choice = input('Include DSD in LSTM predictions? (y/n): ')
+
+    ## Including DSD data for LSTM prediction: pre-process and data preparation
+    if DSD_choice.lower() == 'y':
+        
+        n_bins = 12
+        dc_copy, DSD_columns, bin_edges, feature_map = ipt.setup_DSD(n_bins,Allcases,feature_map,DSD_columns,pre_dict)
+
+    ### POST-PROCESSING ###
+    ipt_pp = Post_processing(Allcases, norm_columns,
+                             feature_map,DSD_choice,DSD_columns)
+
     # scaled input data 
-    post_dict = ipt.scale_inputs(Allcases,features)
+    post_dict = ipt_pp.scale_inputs(pre_dict,post_dict)
 
     # re-shaped input data
-    shaped_input = ipt.shape_inputdata(post_dict)
+    shaped_input = ipt_pp.shape_inputdata(post_dict)
 
-    #plotting
-    ipt.plot_inputdata(Allcases,fine_labels,shaped_input)
+    ### PLOTTING ##
+    if DSD_choice.lower() == 'y':
+
+        ## reshape pre_dict with bins into numpy array for handling and plotting
+        shaped_data_dc = ipt_pp.shape_inputdata(dc_copy)
+
+        ## plot drop count histogram
+        ipt_pp.plot_DSD(shaped_data_dc,bin_edges,fine_labels)
+        ##plot density function histogram
+        ipt_pp.plot_DSD(shaped_input,bin_edges,fine_labels)
+
+    ipt_pp.plot_inputdata(fine_labels,shaped_input)
 
     # smoothing data
 
@@ -383,15 +463,15 @@ def input_data(Allcases, features,smoothing_method,smoothing_params):
     poly_order = smoothing_params[1]
     lowess_frac = smoothing_params[2]
 
-    smoothed_data = ipt.smoothing(shaped_input,smoothing_method,window_size,poly_order,lowess_frac)
+    smoothed_data = ipt_pp.smoothing(shaped_input,smoothing_method,window_size,poly_order,lowess_frac)
 
-    ipt.plot_smoothdata(shaped_input, smoothed_data,fine_labels, smoothing_method, Allcases)
+    ipt_pp.plot_smoothdata(shaped_input, smoothed_data,fine_labels, smoothing_method)
 
     ## saving input data 
 
     save_dict = {'smoothed_data' : smoothed_data,
                  'case_labels' : Allcases,
-                 'features' : features}
+                 'features' : norm_columns+DSD_columns}
 
     with open(os.path.join(input_savepath,'inputdata.pkl'),'wb') as file:
         pickle.dump(save_dict,file)
@@ -399,8 +479,10 @@ def input_data(Allcases, features,smoothing_method,smoothing_params):
 ##################################### WINDOWING FUN. #################################################
 
 def windowing(steps_in,steps_out,stride,train_frac,test_frac, input_df, Allcases, features):
+    
     ## Class instance declarations:
     windowing = Window_data()
+    norm_columns = features[:2]
 
     ## namedtuple used to return all data arrays
     WindowedData = namedtuple('WindowedData', [
@@ -415,8 +497,8 @@ def windowing(steps_in,steps_out,stride,train_frac,test_frac, input_df, Allcases
     ## plotting split data
     plot_choice = input('plot split data sets? (y/n) :')
     if plot_choice.lower() == 'y' or plot_choice.lower() == 'yes':
-        windowing.plot_split_cases(input_df, fine_labels, splitset_labels, train_arr, val_arr, test_arr, 
-                            features,Allcases)
+        windowing.plot_split_cases(fine_labels, splitset_labels, train_arr, val_arr, test_arr, 
+                            norm_columns,Allcases)
     else:
         pass
 
@@ -837,7 +919,7 @@ def main():
     ####### WINDOW DATA ########
 
     ## Windowing hyperparameters
-    steps_in, steps_out = 30, 15
+    steps_in, steps_out = 40, 30
     stride = 1
 
     ## Smoothing parameters
@@ -861,9 +943,13 @@ def main():
         #Random sampling
         cases = random.sample(Allcases,len(Allcases))
 
-        features = ['Number of drops', 'Interfacial Area']
+        # List of features to be normalized (without DSD)
+        feature_map = {'Number of drops': 'Nd',
+                    'Interfacial Area': 'IA'
+                    }
+        norm_columns = ['Number of drops', 'Interfacial Area']
 
-        input_data(cases,features,smoothing_method,smoothing_params)
+        input_data(cases,feature_map,norm_columns,smoothing_method,smoothing_params)
 
     # Reading saved re-shaped input data from file
     with open(os.path.join(input_savepath,'inputdata.pkl'), 'rb') as file:
@@ -893,7 +979,7 @@ def main():
     hidden_size = 128  # Number of hidden units in the LSTM cell, determines how many weights will be used in the hidden state calculations
     output_size = y_train.shape[-1]  # Number of output features, same as input in this case
     pred_steps = steps_out # Number of future steps to predict
-    batch_size = 25 # How many windows are being processed per pass through the LSTM
+    batch_size = 8 # How many windows are being processed per pass through the LSTM
     learning_rate = 0.005
     num_epochs = 3000
     check_epochs = 100
@@ -902,7 +988,7 @@ def main():
     dynamic_tf = True
 
     # customize loss function 
-    penalty_weight = 10
+    penalty_weight = 1
     loss_fn = custom_loss(penalty_weight)
     trainloader = data.DataLoader(data.TensorDataset(X_train, y_train), shuffle=True, batch_size=batch_size)
     valloader = data.DataLoader(data.TensorDataset(X_val, y_val), shuffle=True, batch_size=batch_size)

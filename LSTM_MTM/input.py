@@ -256,30 +256,6 @@ class DSD_processing():
 
         return f_pre_dict
 
-    def plot_DSD(self,data,bin_edges,fine_labels):
-        
-        t_indices = [70, 80, 90, 100]
-        fig, axes = plt.subplots(2, 2, figsize=(12, 12))
-
-        for idx, t_idx in enumerate(t_indices):
-
-            row = idx // 2
-            col = idx % 2
-
-            for j, case in enumerate(self.cases):
-                label = fine_labels.get(case)
-
-                ax = axes[row, col]
-
-                ax.hist(bin_edges, bins=len(bin_edges), weights=data[t_idx, j, 2:].tolist(), label=f'{label}')
-                ax.set_ylabel('Drop count density function')
-                ax.set_xlabel(r'$Log_{10}(V/V_{cap})$')
-                ax.legend()
-                ax.set_title(f'DSD at time {t_idx*0.005} s')
-
-        plt.tight_layout()
-        plt.show()
-
 class Post_processing():
 
     def __init__(self,cases,norm_columns,feature_map,DSD_choice:str,DSD_columns) -> None:
@@ -468,6 +444,63 @@ class Post_processing():
         plt.savefig(os.path.join(fig_savepath,'smoothed_data'),dpi=dpi)
         plt.show()
 
+    def plot_DSD(self,data,bin_edges,fine_labels):
+        
+        t_indices = [70, 80, 90, 100]
+        fig, axes = plt.subplots(2, 2, figsize=(12, 12))
+
+        for idx, t_idx in enumerate(t_indices):
+
+            row = idx // 2
+            col = idx % 2
+
+            for j, case in enumerate(self.cases):
+                label = fine_labels.get(case)
+
+                ax = axes[row, col]
+
+                ax.hist(bin_edges, bins=len(bin_edges), weights=data[t_idx, j, 2:].tolist(), label=f'{label}')
+                ax.set_ylabel('Drop count density function')
+                ax.set_xlabel(r'$Log_{10}(V/V_{cap})$')
+                ax.legend()
+                ax.set_title(f'DSD at time {t_idx*0.005} s')
+
+        plt.tight_layout()
+        plt.show()
+
+## SETUP DSD METHOD ##
+
+def setup_DSD(n_bins,cases,feature_map,DSD_columns,pre_dict):
+    
+    ## building features to represent all DSD bins
+    for i in range(0,n_bins):
+        key = f'b{i}'
+        DSD_columns.append(key)
+        feature_map[key] = key
+    
+    ## DSD processing class
+    DSD_processor = DSD_processing(cases=cases, num_bins=n_bins)
+    leftmost=1
+    rightmost=10
+
+    ## Pre_dict with bins and drop counts assigned: dc - dropcounts
+    pre_dict_dc, bin_edges = DSD_processor.sort_into_bins(pre_dict)
+
+    ## Filter bins based on left/right most limits
+    pre_dict_dc, bin_width, bins_to_delete, bins_kept = DSD_processor.filter_bins(bin_edges,pre_dict_dc,leftmost,rightmost)
+
+    ## Save a copy of pre_dict with only drop counts just for plotting
+    dc_copy = copy.deepcopy(pre_dict_dc)
+
+    ## Convert bin drop counts into probability density function values
+    pre_dict = DSD_processor.density_func_est(pre_dict_dc,bin_width, bins_kept)
+
+    ## delete bins filtered out from original bin list
+    DSD_columns = [item for item in DSD_columns if item not in bins_to_delete]
+    bin_edges = bin_edges[leftmost:rightmost+1]
+
+    return dc_copy, DSD_columns, bin_edges, feature_map
+
 ## main ##
 
 def main():
@@ -484,6 +517,7 @@ def main():
                    'Interfacial Area': 'IA'
                    }
     norm_columns = ['Number of drops', 'Interfacial Area']
+
     DSD_columns = []
 
     ######## RAW DATA PROCESSING ######
@@ -500,34 +534,9 @@ def main():
 
     ## Including DSD data for LSTM prediction: pre-process and data preparation
     if DSD_choice.lower() == 'y':
+
         n_bins = 12
-        
-        ## building features to represent all DSD bins
-        for i in range(0,n_bins):
-            key = f'b{i}'
-            DSD_columns.append(key)
-            feature_map[key] = key
-        
-        ## DSD processing class
-        DSD_processor = DSD_processing(cases=cases, num_bins=n_bins)
-        leftmost=1
-        rightmost=10
-
-        ## Pre_dict with bins and drop counts assigned: dc - dropcounts
-        pre_dict_dc, bin_edges = DSD_processor.sort_into_bins(pre_dict)
-
-        ## Filter bins based on left/right most limits
-        pre_dict_dc, bin_width, bins_to_delete, bins_kept = DSD_processor.filter_bins(bin_edges,pre_dict_dc,leftmost,rightmost)
-
-        ## Save a copy of pre_dict with only drop counts
-        dc_copy = copy.deepcopy(pre_dict_dc)
-
-        ## Convert bin drop counts into probability density function values
-        pre_dict = DSD_processor.density_func_est(pre_dict_dc,bin_width, bins_kept)
-
-        ## delete bins filtered out from original bin list
-        DSD_columns = [item for item in DSD_columns if item not in bins_to_delete]
-        bin_edges = bin_edges[leftmost:rightmost+1]
+        dc_copy, DSD_columns, bin_edges, feature_map = setup_DSD(n_bins,cases,feature_map,DSD_columns,pre_dict)
 
     ######## POST-PROCESSING ######
 
@@ -549,9 +558,9 @@ def main():
         shaped_data_dc = post_processor.shape_inputdata(dc_copy)
 
         ## plot drop count histogram
-        DSD_processor.plot_DSD(shaped_data_dc,bin_edges,fine_labels)
+        post_processor.plot_DSD(shaped_data_dc,bin_edges,fine_labels)
         ##plot density function histogram
-        DSD_processor.plot_DSD(shaped_input,bin_edges,fine_labels)
+        post_processor.plot_DSD(shaped_input,bin_edges,fine_labels)
 
     #### DATA SMOOTHING AND SAVING
 
