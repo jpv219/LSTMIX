@@ -984,11 +984,11 @@ def main():
     num_epochs = 3000
     check_epochs = 100
 
-    tf_ratio = 0.15
+    tf_ratio = 0.02
     dynamic_tf = True
 
     # customize loss function 
-    penalty_weight = 1
+    penalty_weight = 0.1
     loss_fn = custom_loss(penalty_weight)
     trainloader = data.DataLoader(data.TensorDataset(X_train, y_train), shuffle=True, batch_size=batch_size)
     valloader = data.DataLoader(data.TensorDataset(X_val, y_val), shuffle=True, batch_size=batch_size)
@@ -1022,7 +1022,7 @@ def main():
         
         train_S2S(model,optimizer, loss_fn, trainloader, valloader, scheduler, num_epochs, 
                   check_epochs,pred_steps,X_train,y_train, X_val, y_val,
-                  tf_ratio, dynamic_tf, training_prediction= 'mixed',
+                  tf_ratio, dynamic_tf, training_prediction= 'teacher_forcing',
                   saveas='S2S_out',batch_loss=False)
 
     else:
