@@ -21,11 +21,11 @@ import copy
 
 ## Env. variables ##
 
-fig_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/figs/'
-input_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/input_data/'
+#fig_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/figs/'
+#input_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/input_data/'
 
-#fig_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/figs/'
-#input_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX//LSTM_MTM/input_data/'
+fig_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/figs/'
+input_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX//LSTM_MTM/input_data/'
 
 #fig_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/figs/'
 #input_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/input_data/'
@@ -444,7 +444,7 @@ class Post_processing():
         plt.savefig(os.path.join(fig_savepath,'smoothed_data'),dpi=dpi)
         plt.show()
 
-    def plot_DSD(self,data,bin_edges,fine_labels):
+    def plot_DSD(self,data,bin_edges,fine_labels,dpi=150):
         
         t_indices = [70, 80, 90, 100]
         fig, axes = plt.subplots(2, 2, figsize=(12, 12))
@@ -466,6 +466,7 @@ class Post_processing():
                 ax.set_title(f'DSD at time {t_idx*0.005} s')
 
         plt.tight_layout()
+        plt.savefig(os.path.join(fig_savepath,'DSD_data'),dpi=dpi)
         plt.show()
 
 ## SETUP DSD METHOD ##
@@ -577,6 +578,8 @@ def main():
     save_dict = {'smoothed_data' : smoothed_data,
                  'case_labels' : cases,
                  'features' : norm_columns+DSD_columns}
+    if DSD_choice.lower() == 'y':
+        save_dict['bin_edges'] = bin_edges
 
     with open(os.path.join(input_savepath,'inputdata.pkl'),'wb') as file:
         pickle.dump(save_dict,file)

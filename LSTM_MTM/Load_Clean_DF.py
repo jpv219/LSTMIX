@@ -3,9 +3,9 @@ import pandas as pd
 import Clean_CSV
 import os
 
-global_dir = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/RawData'
+#global_dir = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/RawData'
 #global_dir = '/home/jpv219/Documents/ML/LSTM_SMX/RawData'
-#global_dir = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/RawData'
+global_dir = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/RawData'
 
 ### Generate dataframe with Gamma and drop volume values
 def extract_GVol(elem):

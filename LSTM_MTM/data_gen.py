@@ -14,9 +14,11 @@ import pickle
 #trainedmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/trained_models/'
 #input_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/input_data/'
 
-trainedmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/trained_models/'
-input_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/input_data/'
+#trainedmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/trained_models/'
+#input_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/input_data/'
 
+input_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX//LSTM_MTM/input_data/'
+trainedmod_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/trained_models'
 
 ########################################### MAIN ###########################################
 
@@ -65,12 +67,18 @@ def main():
     input_df = input_pkg['smoothed_data']
     Allcases = input_pkg['case_labels']
     features = input_pkg['features']
+    bins = input_pkg.get('bin_edges', None)
+
+    if bins is None:
+        bin_edges = []
+    else:
+        bin_edges = bins
     
     ## data splitting for training, validating and testing
     train_frac = 9/16
     test_frac = 4/16
 
-    windowed_data = trn.windowing(steps_in,steps_out,stride,train_frac, test_frac, input_df, Allcases,features)
+    windowed_data = trn.windowing(steps_in,steps_out,stride,train_frac, test_frac, input_df, Allcases,features,bin_edges)
 
     model_choice = input('Which model would you like to generate data for? (DMS/S2S): ')
 

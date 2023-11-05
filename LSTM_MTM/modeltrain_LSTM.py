@@ -23,7 +23,6 @@ from collections import namedtuple
 from tools_modeltraining import custom_loss, EarlyStopping
 from input import Post_processing
 from input import RawData_processing
-from input import DSD_processing
 import input as ipt
 
 ## For tuning
@@ -34,14 +33,15 @@ import ray.cloudpickle as raypickle
 
 ## Env. variables ##
 
-fig_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/figs/'
-input_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/input_data/'
-trainedmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/trained_models/'
-tuningmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/tuning/'
+#fig_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/figs/'
+#input_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/input_data/'
+#trainedmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/trained_models/'
+#tuningmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/tuning/'
 
-#fig_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/figs/'
-#input_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX//LSTM_MTM/input_data/'
-#trainedmod_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/trained_models'
+fig_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/figs/'
+input_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX//LSTM_MTM/input_data/'
+trainedmod_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/trained_models'
+tuningmod_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/tuning/'
 
 #fig_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/figs/'
 #input_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/input_data/'
@@ -165,18 +165,19 @@ class Window_data():
         test_cases = splitset_labels[2]
 
         ## Looping over all three data sets
-        for split_set, label in zip([train, val, test], 
+        for split_set, set_label in zip([train, val, test], 
                                     ['Training', 'Validation', 'Test']):
             
-            case_labels = train_cases if label == "Training" else val_cases if label == "Validation" else test_cases
+            case_labels = train_cases if set_label == "Training" else val_cases if set_label == "Validation" else test_cases
 
             t_indices = [70, 80, 90, 100]
             fig, axes = plt.subplots(2, 2, figsize=(12, 12))
-            color_palette = color_palettes[label]
+            color_palette = color_palettes[set_label]
           
-            for axis in axes:
-                for spine in axis.spines.values():
-                    spine.set_linewidth(1.5)
+            for row in axes:
+                for ax in row:
+                    for spine in ax.spines.values():
+                        spine.set_linewidth(1.5)
 
             for idx, t_idx in enumerate(t_indices):
 
@@ -193,6 +194,11 @@ class Window_data():
                     ax.set_xlabel(r'$Log_{10}(V/V_{cap})$')
                     ax.legend()
                     ax.set_title(f'DSD at time {t_idx*0.005} s')
+            
+            ## saving figures
+            fig.savefig(os.path.join(fig_savepath, f'{set_label}_DSD_data.png'), dpi=dpi)
+
+            plt.show()
 
     ## Generate windows from input data
     def window_data(self, df, steps_in, stride, steps_out):
@@ -472,13 +478,15 @@ def input_data(Allcases, feature_map,norm_columns,smoothing_method,smoothing_par
     save_dict = {'smoothed_data' : smoothed_data,
                  'case_labels' : Allcases,
                  'features' : norm_columns+DSD_columns}
+    if DSD_choice.lower() == 'y':
+        save_dict['bin_edges'] = bin_edges
 
     with open(os.path.join(input_savepath,'inputdata.pkl'),'wb') as file:
         pickle.dump(save_dict,file)
 
 ##################################### WINDOWING FUN. #################################################
 
-def windowing(steps_in,steps_out,stride,train_frac,test_frac, input_df, Allcases, features):
+def windowing(steps_in,steps_out,stride,train_frac,test_frac, input_df, Allcases, features,bin_edges):
     
     ## Class instance declarations:
     windowing = Window_data()
@@ -499,6 +507,7 @@ def windowing(steps_in,steps_out,stride,train_frac,test_frac, input_df, Allcases
     if plot_choice.lower() == 'y' or plot_choice.lower() == 'yes':
         windowing.plot_split_cases(fine_labels, splitset_labels, train_arr, val_arr, test_arr, 
                             norm_columns,Allcases)
+        windowing.plot_split_DSD(fine_labels,splitset_labels,train_arr,val_arr,test_arr,Allcases,bin_edges)
     else:
         pass
 
@@ -959,12 +968,18 @@ def main():
     input_df = input_pkg['smoothed_data']
     Allcases = input_pkg['case_labels']
     features = input_pkg['features']
+    bins = input_pkg.get('bin_edges', None)
+
+    if bins is None:
+        bin_edges = []
+    else:
+        bin_edges = bins
 
     ## data splitting for training, validating and testing
     train_frac = 9/16
     test_frac = 4/16
 
-    windowed_data = windowing(steps_in,steps_out,stride,train_frac, test_frac, input_df, Allcases,features)
+    windowed_data = windowing(steps_in,steps_out,stride,train_frac, test_frac, input_df, Allcases,features,bin_edges)
 
     ## Extracting from named tuple
     X_train = windowed_data.X_train
