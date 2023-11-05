@@ -103,7 +103,7 @@ def plot_model_pred(model, model_name,features,set_labels,set,
     with torch.no_grad():
         y_pred_data = model(X_data)
 
-    num_features = len(features) #Nd and IA
+    num_features = len(features)
     num_cases = len(set_labels)
     colors = sns.color_palette("husl", num_cases)
 
@@ -115,12 +115,18 @@ def plot_model_pred(model, model_name,features,set_labels,set,
         if f_idx == 0:        
             axins = inset_axes(ax, width='30%', height='30%', loc='upper center')
             axins.set_ylim(0.3,1.1)
-        else:
+        elif f_idx == 1:
             axins = inset_axes(ax, width='60%', height='30%', loc='lower center',bbox_to_anchor=(0.3, 0.1, 0.5, 0.9), bbox_transform=ax.transAxes)
             axins.set_ylim(0.7,1.1)
+        else:
+            axins = None
         
-        axins.tick_params(bottom=True, top=True, left=True, right=True, axis='both', direction='in', length=5, width=1.5)
-        axins.grid(color='k', linestyle=':', linewidth=0.1) 
+        for axis in ['top', 'bottom', 'left', 'right']:
+            ax.spines[axis].set_linewidth(1.5)
+            if axins:
+                axins.spines[axis].set_linewidth(1.5)
+                axins.tick_params(bottom=True, top=True, left=True, right=True, axis='both', direction='in', length=5, width=1.5)
+                axins.grid(color='k', linestyle=':', linewidth=0.1)
 
         s_idx = 0 # first element to choose from each row, per case
         x_range = range(wind_size-31,len(true_data)-30)
@@ -128,7 +134,7 @@ def plot_model_pred(model, model_name,features,set_labels,set,
         x_range_l = range(wind_size-1,len(true_data))
         
         # Loop over cases
-        for seq, case in zip(range(num_cases), set_labels):
+        for seq, case in enumerate(set_labels):
             # Target plots, true data from CFD
             plot_label = fine_labels.get(case,case)
 
@@ -136,37 +142,37 @@ def plot_model_pred(model, model_name,features,set_labels,set,
                          label=f'Target {plot_label}', color=colors[seq % len(colors)], 
                          linewidth = 3) # true_data has shape [times,cases,features]
             
-            axins.plot(true_data[:, seq, f_idx], label=f'Target {plot_label}', color=colors[seq % len(colors)], 
-                         linewidth = 3)
-            
-            plt.setp(ax.spines.values(),linewidth = 1.5)
-            for axis in ['top', 'bottom', 'left', 'right']:
-                ax.spines[axis].set_linewidth(1.5)  # change width
-            
+            if axins:
+                axins.plot(true_data[:, seq, f_idx], label=f'Target {plot_label}', color=colors[seq % len(colors)], 
+                            linewidth = 3)
+                        
             # Plot a given position from each output window generated from the windowed X data - representing final training and validation state 
             # y_pred_data has shape (number of rows for all cases (separated by casebatch), timesteps per row (input and output steps for X and y respectively), features)
             if seq == 0:
                 ax.plot(x_range,
-                        y_pred_data[:casebatch_len[seq],s_idx,f_idx],'s', markersize=5, #separating each case and selecting a given s_idx from each output window/row
+                        y_pred_data[:casebatch_len[seq],s_idx,f_idx],'s', markersize=5,markevery = 2, #separating each case and selecting a given s_idx from each output window/row
                         markerfacecolor=p[0].get_color(),alpha=0.8, markeredgewidth=1.5, markeredgecolor='k',
                         lw=0.0, label=f'Pred. {plot_label}')
                 
-                #last element from each window insert plot
-                axins.plot(x_range_l,y_pred_data[:casebatch_len[seq],s_idx_l,f_idx], 'o', markersize = 5, 
-                        markerfacecolor=p[0].get_color(),alpha=0.8, markeredgewidth=1.5, markeredgecolor='k',
-                        lw=0.0, label=f'Pred. {plot_label}')
+                if axins is not None:
+                    #last element from each window insert plot
+                    axins.plot(x_range_l,y_pred_data[:casebatch_len[seq],s_idx_l,f_idx], 'o', markersize = 5,markevery = 2, 
+                            markerfacecolor=p[0].get_color(),alpha=0.8, markeredgewidth=1.5, markeredgecolor='k',
+                            lw=0.0, label=f'Pred. {plot_label}')
+                    axins.set_xlim(wind_size-1, len(true_data)+5)
             else:
                 ax.plot(x_range,
-                        y_pred_data[casebatch_len[seq-1]:casebatch_len[seq],s_idx,f_idx],'s', markersize=5, 
+                        y_pred_data[casebatch_len[seq-1]:casebatch_len[seq],s_idx,f_idx],'s', markersize=5,markevery = 2, 
                         markerfacecolor=p[0].get_color(),alpha=0.8, markeredgewidth=1.5, markeredgecolor='k',
                         lw=0.0, label=f'Pred. {plot_label}')
                 
-                axins.plot(x_range_l,y_pred_data[casebatch_len[seq-1]:casebatch_len[seq],s_idx_l,f_idx], 'o', markersize = 5, 
-                        markerfacecolor=p[0].get_color(),alpha=0.8, markeredgewidth=1.5, markeredgecolor='k',
-                        lw=0.0, label=f'Pred. {plot_label}')
+                if axins is not None:
+                    axins.plot(x_range_l,y_pred_data[casebatch_len[seq-1]:casebatch_len[seq],s_idx_l,f_idx], 'o', markersize = 5,markevery = 2, 
+                            markerfacecolor=p[0].get_color(),alpha=0.8, markeredgewidth=1.5, markeredgecolor='k',
+                            lw=0.0, label=f'Pred. {plot_label}')
+                    axins.set_xlim(wind_size-1, len(true_data)+5)
                    
         ax.legend()
-        axins.set_xlim(wind_size-1, len(true_data)+5)
         ax.set_xlim(0, 110)
         ax.set_ylim(0)
         ax.set_title(f'Prediction with LSTM {model_name} for {features[f_idx]} in {set} set')
@@ -178,6 +184,55 @@ def plot_model_pred(model, model_name,features,set_labels,set,
         fig.savefig(os.path.join(fig_savepath, f'Pred_{model_name}_{features[f_idx]}_{set}_set.png'), dpi=150)
         plt.show()
 
+    ## DSD Plotting if training data contains more features
+    if X_data.shape[-1] > 2:
+        # Loop over features: Drop size range
+        bin_idxs = num_features - 2
+        fig2,axes2 = plt.subplots(2,int(bin_idxs/2), figsize=(int(bin_idxs/2*5),5))
+        fig2.tight_layout(rect=[0.05,0.02,1,0.9]) # [left, bottom, right, top]
+        fig2.subplots_adjust(wspace=0.2)
+
+        for f_idx in range(2, num_features):
+
+            for seq, case in zip(range(num_cases), set_labels):
+                # Target plots, true data from CFD
+                plot_label = fine_labels.get(case,case)
+                row = int(f_idx-2) // int(bin_idxs/2)  # Calculate the row for the subplot
+                col = int(f_idx-2) % int(bin_idxs/2)  # Calculate the column for the subplot
+                ax2 = axes2[row, col]
+
+                p = ax2.plot(true_data[:, seq, f_idx], 
+                            label=f'Target {plot_label}', color=colors[seq % len(colors)], 
+                            linewidth = 3) # true_data has shape [times,cases,features]
+
+
+                for axis in ['top', 'bottom', 'left', 'right']:
+                    ax2.spines[axis].set_linewidth(1.5)  # change width
+                
+                # Plot a given position from each output window generated from the windowed X data - representing final training and validation state 
+                # y_pred_data has shape (number of rows for all cases (separated by casebatch), timesteps per row (input and output steps for X and y respectively), features)
+                if seq == 0:
+                    ax2.plot(x_range_l,
+                            y_pred_data[:casebatch_len[seq],s_idx_l,f_idx],'s', markersize=5,markevery = 2, #separating each case and selecting a given s_idx from each output window/row
+                            markerfacecolor=p[0].get_color(),alpha=0.8, markeredgewidth=1.5, markeredgecolor='k',
+                            lw=0.0, label=f'Pred. {plot_label}')
+                    
+                else:
+                    ax2.plot(x_range_l,
+                            y_pred_data[casebatch_len[seq-1]:casebatch_len[seq],s_idx_l,f_idx],'s', markersize=5, markevery = 2,
+                            markerfacecolor=p[0].get_color(),alpha=0.8, markeredgewidth=1.5, markeredgecolor='k',
+                            lw=0.0, label=f'Pred. {plot_label}')
+                    
+                ax2.set_title(f'{set}: {features[f_idx]}', fontsize=25)
+                ax2.grid(color='k', linestyle=':', linewidth=0.1)
+                ax2.tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', length=5, width=1.5)
+
+        fig2.supxlabel('Time steps',fontsize=30)
+        fig2.supylabel('PD per DSD bin',fontsize=30)
+        fig2.suptitle(f'Prediction with LSTM {model_name} for DSD {set} set',fontsize=40)
+        fig2.savefig(os.path.join(fig_savepath, f'Predall_{model_name}_DSD_{set}_set.png'), dpi=150)
+        plt.show()
+            
 def plot_rollout_pred(rollout_seq, true_data, input_steps, features,set_labels, model_name):
 
     colors = sns.color_palette("hsv", len(set_labels))
@@ -217,149 +272,47 @@ def plot_rollout_pred(rollout_seq, true_data, input_steps, features,set_labels, 
 
         fig.savefig(os.path.join(fig_savepath, f'Rollout_{model_name}_{features[f_idx]}.png'), dpi=150)
         plt.show()
-
-# Functions to plot predictions including DSD
-def plot_all_model_pred(model,fine_labels, model_name,features,set_labels,set,
-                    X_data,true_data,wind_size,casebatch_len):
     
-    model.eval()
+    if true_data.shape[-1] > 1:
+        bin_idxs = num_features - 2
+        fig2,axes2 = plt.subplots(2,int(bin_idxs/2), figsize=(int(bin_idxs/2*5),5))
+        fig2.tight_layout(rect=[0.05,0.02,1,0.9]) # [left, bottom, right, top]
+        fig2.subplots_adjust(wspace=0.2)
 
-    # Retrieving final training and validation state from windowed X tensor
-    with torch.no_grad():
-        y_pred_data = model(X_data)
 
-    num_features = len(features)
-    num_cases = len(set_labels)
-    colors = sns.color_palette('muted', num_cases)
+        for f_idx in range(2, num_features):
+            # looping through cases
+            for i, case in enumerate(set_labels):
 
-    # Loop over features: Nd, IA
-    for f_idx in range(0,2):
-
-        fig, ax = plt.subplots(figsize=(12, 6))
-
-        # if f_idx == 0:        
-        #     # plt.axs([left, bottom, width, height])            
-        #     # axins = plt.axes([0.5, 0.2, .25, .30]) # train set Nd
-        #     # axins.set_ylim(0.4,0.9)
-        #     axins = plt.axes([0.6, 0.2, .25, .30])# val set Nd
-        #     axins.set_ylim(0.7,1.05)
-
-        # else:
-        #     # axins = plt.axes([0.45, 0.2, .25, .3])# train set Nd
-        #     # axins.set_ylim(0.4,0.9)
-        #     axins = plt.axes([0.6, 0.3, .25, .3])# val set Nd
-        #     axins.set_ylim(0.7,1.05)
-        
-        # axins.tick_params(bottom=True, top=True, left=True, right=True, axis='both', direction='in', length=5, width=1.5)
-        # axins.grid(color='k', linestyle=':', linewidth=0.1) 
-
-        s_idx = -1 # first element to choose from each row, per case
-        x_range = range(wind_size-1,len(true_data))
-        s_idx_l = -1
-        x_range_l = range(wind_size-1,len(true_data))
-        
-        # Loop over cases
-        for seq, case in zip(range(num_cases), set_labels):
-            # Target plots, true data from CFD
-            plot_label = fine_labels.get(case,case)
-
-            p = ax.plot(true_data[:, seq, f_idx], 
-                        label=f'Target {plot_label}', color=colors[seq % len(colors)], 
-                        linewidth = 3) # true_data has shape [times,cases,features]
+                plot_label = fine_labels.get(case,case)
+                row = int(f_idx-2) // int(bin_idxs/2)  # Calculate the row for the subplot
+                col = int(f_idx-2) % int(bin_idxs/2)  # Calculate the column for the subplot
+                ax = axes2[row, col]
             
-            # axins.plot(true_data[:, seq, f_idx], label=f'Target {plot_label}', color=colors[seq % len(colors)], 
-            #             linewidth = 3)
+                ## truedata shaped as (timesteps, cases, features) and rollout as (case,timestep,features)
+                r2 = r2_score(true_data[:,i,f_idx],rollout_seq[i,:,f_idx][:true_data.shape[0]])
+
+                p = ax.plot(true_data[:,i,f_idx], label=f'Target {plot_label}, $R^2$:{r2:.4f}',color = colors[i % len(colors)],linewidth = 3)
+
+                # plotting rollout predictions from input steps until length of true data. Rolloutseq has shape (cases,timesteps,features)
+                ax.plot(range(input_steps,len(true_data)),rollout_seq[i,input_steps:len(true_data),f_idx],'s',markersize=5, # plotting interval after input steps until true data ends
+                        markerfacecolor=p[0].get_color(),alpha=0.8,markeredgewidth=1.5, markeredgecolor='k', markevery=2,
+                        lw=0.0, label=f'{model_name} Pred. {plot_label}')
+
+                for axis in ['top', 'bottom', 'left', 'right']:
+                    ax.spines[axis].set_linewidth(1.5)  # change width
             
-            plt.setp(ax.spines.values(),linewidth = 1.5)
-            for axis in ['top', 'bottom', 'left', 'right']:
-                ax.spines[axis].set_linewidth(1.5)  # change width
-            
-            # Plot a given position from each output window generated from the windowed X data - representing final training and validation state 
-            # y_pred_data has shape (number of rows for all cases (separated by casebatch), timesteps per row (input and output steps for X and y respectively), features)
-            if seq == 0:
-                ax.plot(x_range,
-                        y_pred_data[:casebatch_len[seq],s_idx,f_idx],'s', markersize=5, #separating each case and selecting a given s_idx from each output window/row
-                        markerfacecolor=p[0].get_color(),alpha=0.8, markeredgewidth=1.5, markeredgecolor='k',markevery=5,
-                        lw=0.0, label=f'Pred. {plot_label}')
-                
-                #last element from each window insert plot
-                # axins.plot(x_range_l,y_pred_data[:casebatch_len[seq],s_idx_l,f_idx], 'o', markersize = 5, 
-                        # markerfacecolor=p[0].get_color(),alpha=0.8, markeredgewidth=1.5, markeredgecolor='k',markevery=5,
-                        # lw=0.0, label=f'Pred. {plot_label}')
-            else:
-                ax.plot(x_range,
-                        y_pred_data[casebatch_len[seq-1]:casebatch_len[seq],s_idx,f_idx],'s', markersize=5, 
-                        markerfacecolor=p[0].get_color(),alpha=0.8, markeredgewidth=1.5, markeredgecolor='k',markevery=5,
-                        lw=0.0, label=f'Pred. {plot_label}')
-                
-                # axins.plot(x_range_l,y_pred_data[casebatch_len[seq-1]:casebatch_len[seq],s_idx_l,f_idx], 'o', markersize = 5, markevery=5,
-                #         markerfacecolor=p[0].get_color(),alpha=0.8, markeredgewidth=1.5, markeredgecolor='k',
-                #         lw=0.0, label=f'Pred. {plot_label}')
-                
-        ax.legend(loc='upper left')
-        # axins.set_xlim(len(true_data)-wind_size-1, 400)
-        # axins.set_title('Prediction from last element of windows')
-        ax.set_title(f'Prediction with LSTM {model_name} for {features[f_idx]} in {set} set')
-        ax.set_xlabel('Time steps')
-        ax.set_ylabel(f'Scaled {features[f_idx]}')
-        ax.grid(color='k', linestyle=':', linewidth=0.1)
-        ax.tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', length=5, width=1.5)
-
-        fig.savefig(os.path.join(fig_savepath, f'Pred_{model_name}_{features[f_idx]}_{set}_set.png'), dpi=150)
-        plt.show()
-
-    
-    # Loop over features: Drop size range
-    bin_idxs = num_features - 2
-    fig,axes = plt.subplots(2,int(bin_idxs/2), figsize=(int(bin_idxs/2*5),5))
-    fig.tight_layout(rect=[0.05,0.02,1,0.9]) # [left, bottom, right, top]
-    fig.subplots_adjust(wspace=0.2)
-
-    for f_idx in range(2, num_features):
-
-        s_idx = 0 # first element to choose from each row, per case
-        x_range = range(wind_size-51,len(true_data)-50)
-        s_idx_l = -1
-        x_range_l = range(wind_size-1,len(true_data))
-
-        for seq, case in zip(range(num_cases), set_labels):
-            # Target plots, true data from CFD
-            plot_label = fine_labels.get(case,case)
-            row = int(f_idx-2) // int(bin_idxs/2)  # Calculate the row for the subplot
-            col = int(f_idx-2) % int(bin_idxs/2)  # Calculate the column for the subplot
-            ax = axes[row, col]
-
-            p = ax.plot(true_data[:, seq, f_idx], 
-                        label=f'Target {plot_label}', color=colors[seq % len(colors)], 
-                        linewidth = 3) # true_data has shape [times,cases,features]
-            plt.setp(ax.spines.values(),linewidth = 1.5)
-            for axis in ['top', 'bottom', 'left', 'right']:
-                ax.spines[axis].set_linewidth(1.5)  # change width
-            
-            # Plot a given position from each output window generated from the windowed X data - representing final training and validation state 
-            # y_pred_data has shape (number of rows for all cases (separated by casebatch), timesteps per row (input and output steps for X and y respectively), features)
-            if seq == 0:
-                ax.plot(x_range,
-                        y_pred_data[:casebatch_len[seq],s_idx,f_idx],'s', markersize=5, #separating each case and selecting a given s_idx from each output window/row
-                        markerfacecolor=p[0].get_color(),alpha=0.8, markeredgewidth=1.5, markeredgecolor='k',markevery=5,
-                        lw=0.0, label=f'Pred. {plot_label}')
-                
-            else:
-                ax.plot(x_range,
-                        y_pred_data[casebatch_len[seq-1]:casebatch_len[seq],s_idx,f_idx],'s', markersize=5, 
-                        markerfacecolor=p[0].get_color(),alpha=0.8, markeredgewidth=1.5, markeredgecolor='k',markevery=5,
-                        lw=0.0, label=f'Pred. {plot_label}')
-                
-            axes[0,0].legend(fontsize=10)
-            ax.set_title(f'{set}: {features[f_idx]}', fontsize=25)
+            ax.set_title(f'{features[f_idx]}', fontsize=25)
             ax.grid(color='k', linestyle=':', linewidth=0.1)
             ax.tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', length=5, width=1.5)
 
-    fig.supxlabel('Time steps',fontsize=30)
-    fig.supylabel('Estimated density of Drop count in drop size ranges',fontsize=30)
-    fig.suptitle(f'Prediction with LSTM {model_name} for Drop count in drop size ranges in {set} set',fontsize=40)
-    fig.savefig(os.path.join(fig_savepath, f'Predall_{model_name}_DSD_{set}_set.png'), dpi=150)
-    plt.show()
+        fig2.supxlabel('Time steps', fontsize=30)
+        fig2.supylabel('PD per DSD bin', fontsize=30)
+        fig2.suptitle(f'Rollout with LSTM {model_name} for DSD bins', fontsize=40)
+        fig2.savefig(os.path.join(fig_savepath, f'Rollout_{model_name}_DSD.png'), dpi=150)
+        plt.show()
+
+# Functions to plot predictions including DSD
 
 def plot_rollout_dist(rollout_seq, true_data, input_steps, set_labels, bin_edges, model_name):
     colors = sns.color_palette('muted', len(set_labels))
@@ -508,20 +461,12 @@ def main():
         train_casebatch = casebatches[0]
         val_casebatch = casebatches[1]
 
-        if X_train.shape[-1] == 2:
-            # using windowed tensors for plots to represent final training and validation state
-            plot_model_pred(model, model_choice, features, splitset_labels[0],
-                            'Train',X_train, train_arr, wind_size, train_casebatch)
-            
-            plot_model_pred(model, model_choice, features, splitset_labels[1],
-                    'Validation',X_val, val_arr, wind_size, val_casebatch)
-        else:
-            plot_all_model_pred(model, fine_labels,model_choice, features, splitset_labels[0],
-                            'Train',X_train, train_arr, wind_size, train_casebatch)
-            plot_all_model_pred(model,fine_labels, model_choice, features, splitset_labels[1],
+        # using windowed tensors for plots to represent final training and validation state
+        plot_model_pred(model, model_choice, features, splitset_labels[0],
+                        'Train',X_train, train_arr, wind_size, train_casebatch)
+        
+        plot_model_pred(model, model_choice, features, splitset_labels[1],
                 'Validation',X_val, val_arr, wind_size, val_casebatch)
-    else:
-        pass
 
     ## carry out rollout predictions on testing data sets
     test_arr = arrays[2]
@@ -535,10 +480,11 @@ def main():
     ## Calling rollout prediction for test data
     rollout_seq = rollout(model,input_seq,hyperparams["steps_out"],total_steps)
 
-    #plot_rollout_pred(rollout_seq,test_arr, hyperparams['steps_in'], features,splitset_labels[2], model_choice)
+    plot_rollout_pred(rollout_seq,test_arr, hyperparams['steps_in'], features,splitset_labels[2], model_choice)
 
-    if test_arr.shape[-1] > 2:
-        plot_rollout_dist(rollout_seq,test_arr, hyperparams['steps_in'], splitset_labels[2], bin_edges, model_choice)
+    #if test_arr.shape[-1] > 2:
+        #plot_all_rollout_pred(rollout_seq,test_arr,hyperparams['steps_in'],features,splitset_labels[2],model_choice)
+        #plot_rollout_dist(rollout_seq,test_arr, hyperparams['steps_in'], splitset_labels[2], bin_edges, model_choice)
 
 if __name__ == "__main__":
     main()

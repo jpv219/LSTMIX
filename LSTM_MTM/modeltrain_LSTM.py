@@ -991,15 +991,15 @@ def main():
 
     # Define hyperparameters
     input_size = X_train.shape[-1]  # Number of features in the input tensor
-    hidden_size = 128  # Number of hidden units in the LSTM cell, determines how many weights will be used in the hidden state calculations
+    hidden_size = 256  # Number of hidden units in the LSTM cell, determines how many weights will be used in the hidden state calculations
     output_size = y_train.shape[-1]  # Number of output features, same as input in this case
     pred_steps = steps_out # Number of future steps to predict
-    batch_size = 8 # How many windows are being processed per pass through the LSTM
+    batch_size = 36 # How many windows are being processed per pass through the LSTM
     learning_rate = 0.005
     num_epochs = 3000
     check_epochs = 100
 
-    tf_ratio = 0.02
+    tf_ratio = 0.4
     dynamic_tf = True
 
     # customize loss function 
@@ -1037,7 +1037,7 @@ def main():
         
         train_S2S(model,optimizer, loss_fn, trainloader, valloader, scheduler, num_epochs, 
                   check_epochs,pred_steps,X_train,y_train, X_val, y_val,
-                  tf_ratio, dynamic_tf, training_prediction= 'teacher_forcing',
+                  tf_ratio, dynamic_tf, training_prediction= 'mixed',
                   saveas='S2S_out',batch_loss=False)
 
     else:
