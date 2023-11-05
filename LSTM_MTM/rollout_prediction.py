@@ -325,28 +325,32 @@ def plot_rollout_dist(rollout_seq, true_data, input_steps, set_labels, bin_edges
         t_label = t
         
         # temporal distribution
-        fig,axes = plt.subplots(1,2, figsize=(12, 6))
+        fig,ax = plt.subplots(2,2, figsize=(12, 6))
         fig.tight_layout(rect=[0.05,0.02,1,0.9])
         for seq, case in enumerate(set_labels):
+
+            row = seq // 2
+            col = seq % 2
+
+            axes = ax[row, col]
             
             # Target plots, true data from CFD
             plot_label = fine_labels.get(case,case)
 
-            axes[seq].hist(bin_edges, bins=len(bin_edges), weights=true_data[t,seq,2:], color='gray', alpha=0.5, label=f'Target')
-            axes[seq].hist(bin_edges, bins=len(bin_edges), weights=rollout_seq[seq,t,2:],color = colors[seq % len(colors)],
+            axes.hist(bin_edges, bins=len(bin_edges), weights=true_data[t,seq,2:], color='gray', alpha=0.5, label=f'Target')
+            axes.hist(bin_edges, bins=len(bin_edges), weights=rollout_seq[seq,t,2:],color = colors[seq % len(colors)],
                            lw=2, fill=None, histtype='step', label=f'Pred')
             
-            plt.setp(axes[seq].spines.values(),linewidth = 1.5)
             for axis in ['top', 'bottom', 'left', 'right']:
-                axes[seq].spines[axis].set_linewidth(1.5)  # change width
+                axes.spines[axis].set_linewidth(1.5)  # change width
 
-            axes[seq].set_title(f'{plot_label}')
-            axes[seq].legend(loc='upper left')
+            axes.set_title(f'{plot_label}')
+            axes.legend(loc='upper left')
         
-        fig.suptitle(f'Prediction with {model_name} for Drop size Distribution at time {t_label:.4f} [Rev.]', fontweight='bold')
-        fig.supxlabel(f'Scaled drop size',fontweight='bold')
-        fig.supylabel(f'Drop count density',fontweight='bold')
-        fig.savefig(os.path.join(fig_savepath, 'temporal_dist',f'Rollout_{model_name}_DSD_{t+320}.png'), dpi=150)
+        fig.suptitle(f'Prediction with {model_name} for DSD at timestep {t_label:.4f}', fontweight='bold')
+        fig.supxlabel(r'$Log_{10}(V/V_{cap})$',fontweight='bold')
+        fig.supylabel(f'Probability Density',fontweight='bold')
+        fig.savefig(os.path.join(fig_savepath, 'temporal_dist',model_name,f'Rollout_{model_name}_DSD_{t}.png'), dpi=150)
         #plt.show()
 
 
@@ -359,7 +363,7 @@ def plot_rollout_dist(rollout_seq, true_data, input_steps, set_labels, bin_edges
                 emd=0
             
             axes1[0].scatter(t_label, emd,color = colors[seq % len(colors)],label=f'{plot_label}')
-            axes1[0].set_xlim([13,22])
+            axes1[0].set_xlim([40,105])
             axes1[0].set_ylim([0,1])
             axes1[0].set_title('Wasserstein value',fontweight='bold')
             axes1[0].set_xlabel('Time step',fontweight='bold')
@@ -367,18 +371,17 @@ def plot_rollout_dist(rollout_seq, true_data, input_steps, set_labels, bin_edges
             ## Wasserstain 
             kl_PQ = kl_div(np.array(true_data[t,seq,2:]),np.array(rollout_seq[seq,t,2:])).sum()
             axes1[1].scatter(t_label, kl_PQ ,color = colors[seq % len(colors)],label=f'{plot_label}')
-            axes1[1].set_xlim([13,22])
+            axes1[1].set_xlim([40,105])
             axes1[1].set_ylim([0,1])
             axes1[1].set_title('K-L divergence',fontweight='bold')
             axes1[1].set_xlabel('Time step',fontweight='bold')
 
-            plt.setp(axes1[seq].spines.values(),linewidth = 1.5)
             for axis in ['top', 'bottom', 'left', 'right']:
                 axes1[0].spines[axis].set_linewidth(1.5)  # change width
                 axes1[1].spines[axis].set_linewidth(1.5)
             
         fig1.suptitle(f'Comparison between Target and Prediction from {model_name}',fontweight='bold')
-        fig1.savefig(os.path.join(fig_savepath, 'temporal_EMD',f'EMD_{model_name}_DSD_{t+320}.png'), dpi=150)
+        fig1.savefig(os.path.join(fig_savepath, 'temporal_EMD',model_name,f'EMD_{model_name}_DSD_{t}.png'), dpi=150)
 
 def main():
     
@@ -480,11 +483,10 @@ def main():
     ## Calling rollout prediction for test data
     rollout_seq = rollout(model,input_seq,hyperparams["steps_out"],total_steps)
 
-    plot_rollout_pred(rollout_seq,test_arr, hyperparams['steps_in'], features,splitset_labels[2], model_choice)
+    #plot_rollout_pred(rollout_seq,test_arr, hyperparams['steps_in'], features,splitset_labels[2], model_choice)
 
-    #if test_arr.shape[-1] > 2:
-        #plot_all_rollout_pred(rollout_seq,test_arr,hyperparams['steps_in'],features,splitset_labels[2],model_choice)
-        #plot_rollout_dist(rollout_seq,test_arr, hyperparams['steps_in'], splitset_labels[2], bin_edges, model_choice)
+    if test_arr.shape[-1] > 2:
+        plot_rollout_dist(rollout_seq,test_arr, hyperparams['steps_in'], splitset_labels[2], bin_edges, model_choice)
 
 if __name__ == "__main__":
     main()
