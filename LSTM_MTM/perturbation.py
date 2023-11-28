@@ -1,6 +1,5 @@
 ### LSTM perturbation and uncertainty analysis
 ### Authors: Fuyue Liang and Juan Pablo Valdes
-### Code adapted from Fuyue Liang LSTM for stirred vessels
 ### First commit: Oct, 2023
 ### Department of Chemical Engineering, Imperial College London
 #########################################################################################################################################################
