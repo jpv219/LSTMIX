@@ -403,7 +403,7 @@ class Post_processing():
         axes[0].legend(loc='upper left', bbox_to_anchor=(0.0, 1.0), ncol=2,fontsize='xx-small')
 
         plt.tight_layout()
-        plt.savefig(os.path.join(fig_savepath,'input_data'),dpi=dpi)
+        plt.savefig(os.path.join(fig_savepath,'input_data','input_Nd_IA'),dpi=dpi)
         plt.show()
 
     def plot_smoothdata(self,data, smoothed_data, fine_labels, method,dpi=150):
@@ -441,7 +441,7 @@ class Post_processing():
                 spine.set_linewidth(1.5)
             
         plt.tight_layout()
-        plt.savefig(os.path.join(fig_savepath,'smoothed_data'),dpi=dpi)
+        plt.savefig(os.path.join(fig_savepath,'input_data','smoothed_data'),dpi=dpi)
         plt.show()
 
     def plot_DSD(self,data,bin_edges,fine_labels,dpi=150):
@@ -459,14 +459,14 @@ class Post_processing():
 
                 ax = axes[row, col]
 
-                ax.hist(bin_edges, bins=len(bin_edges), weights=data[t_idx, j, 2:].tolist(), label=f'{label}')
+                ax.hist(bin_edges, bins=len(bin_edges), fill=False,weights=data[t_idx, j, 2:].tolist(), label=f'{label}')
                 ax.set_ylabel('Drop count density function')
                 ax.set_xlabel(r'$Log_{10}(V/V_{cap})$')
                 ax.legend()
                 ax.set_title(f'DSD at time {t_idx*0.005} s')
 
         plt.tight_layout()
-        plt.savefig(os.path.join(fig_savepath,'DSD_data'),dpi=dpi)
+        plt.savefig(os.path.join(fig_savepath,'input_data','DSD_data'),dpi=dpi)
         plt.show()
 
 ## SETUP DSD METHOD ##
@@ -506,9 +506,9 @@ def setup_DSD(n_bins,cases,feature_map,DSD_columns,pre_dict):
 
 def main():
 
-    Allcases = ['b03','b06','bi001','bi01','da01','da1','b06pm','b09pm','bi001pm',
-    'bi1','bi01pm','3drop',
-    'b09','da01pm','da001', 'coarsepm']
+    Allcases = ['bi001', 'bi01', 'b09', 'b06pm', 'b03', 'da01pm', 'da01', 'bi01pm', '3drop',
+        'coarsepm', 'bi001pm', 'bi1',
+        'b06', 'b09pm', 'da1', 'da001']
 
     # Randomizing cases for different train-test set splitting
     cases = random.sample(Allcases,len(Allcases))
@@ -524,7 +524,7 @@ def main():
     ######## RAW DATA PROCESSING ######
 
    ## raw data pre-processing, extracting and sorting from csv files
-    rd_processor = RawData_processing(cases=cases)
+    rd_processor = RawData_processing(cases=Allcases)
 
     ## post dict empty with case slots built in
     pre_dict,post_dict = rd_processor.sort_inputdata()
@@ -537,11 +537,11 @@ def main():
     if DSD_choice.lower() == 'y':
 
         n_bins = 12
-        dc_copy, DSD_columns, bin_edges, feature_map = setup_DSD(n_bins,cases,feature_map,DSD_columns,pre_dict)
+        dc_copy, DSD_columns, bin_edges, feature_map = setup_DSD(n_bins,Allcases,feature_map,DSD_columns,pre_dict)
 
     ######## POST-PROCESSING ######
 
-    post_processor = Post_processing(cases=cases,
+    post_processor = Post_processing(cases=Allcases,
                     norm_columns=norm_columns,feature_map=feature_map,
                     DSD_choice=DSD_choice,DSD_columns=DSD_columns)
 
@@ -576,7 +576,7 @@ def main():
     ## saving input data 
 
     save_dict = {'smoothed_data' : smoothed_data,
-                 'case_labels' : cases,
+                 'case_labels' : Allcases,
                  'features' : norm_columns+DSD_columns}
     if DSD_choice.lower() == 'y':
         save_dict['bin_edges'] = bin_edges

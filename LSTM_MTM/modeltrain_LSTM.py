@@ -146,10 +146,11 @@ class Window_data():
                     ax[i].legend()
 
             ## saving figures
-            fig.savefig(os.path.join(fig_savepath, f'{label}_data_{features[i]}.png'), dpi=dpi)
+            fig.savefig(os.path.join(fig_savepath,'split_data', f'{label}_data_{features[i]}.png'), dpi=dpi)
 
             plt.show()
 
+    ## plot split DSD data
     def plot_split_DSD(self, fine_labels, splitset_labels, train, val, test, 
                         case_labels, bin_edges, dpi=150):
         
@@ -179,6 +180,7 @@ class Window_data():
                     for spine in ax.spines.values():
                         spine.set_linewidth(1.5)
 
+            ## plotting each histogram at a different timestep
             for idx, t_idx in enumerate(t_indices):
 
                 row = idx // 2
@@ -196,7 +198,7 @@ class Window_data():
                     ax.set_title(f'DSD at time {t_idx*0.005} s')
             
             ## saving figures
-            fig.savefig(os.path.join(fig_savepath, f'{set_label}_DSD_data.png'), dpi=dpi)
+            fig.savefig(os.path.join(fig_savepath, 'split_data',f'{set_label}_DSD_data.png'), dpi=dpi)
 
             plt.show()
 
@@ -945,9 +947,9 @@ def main():
     if choice.lower() == 'y':
 
         ## Cases to split and features to read from 
-        Allcases = ['b03','b06','bi001','bi01','da01','da1','b06pm','b09pm','bi001pm',
-        'bi1','bi01pm','3drop',
-        'b09','da01pm','da001', 'coarsepm']
+        Allcases = ['bi001', 'bi01', 'b09', 'b06pm', 'b03', 'da01pm', 'da01', 'bi01pm', '3drop',
+        'coarsepm', 'bi001pm', 'bi1',
+        'b06', 'b09pm', 'da1', 'da001']
 
         #Random sampling
         cases = random.sample(Allcases,len(Allcases))
@@ -958,7 +960,7 @@ def main():
                     }
         norm_columns = ['Number of drops', 'Interfacial Area']
 
-        input_data(cases,feature_map,norm_columns,smoothing_method,smoothing_params)
+        input_data(Allcases,feature_map,norm_columns,smoothing_method,smoothing_params)
 
     # Reading saved re-shaped input data from file
     with open(os.path.join(input_savepath,'inputdata.pkl'), 'rb') as file:
@@ -991,10 +993,10 @@ def main():
 
     # Define hyperparameters
     input_size = X_train.shape[-1]  # Number of features in the input tensor
-    hidden_size = 256  # Number of hidden units in the LSTM cell, determines how many weights will be used in the hidden state calculations
+    hidden_size = 64  # Number of hidden units in the LSTM cell, determines how many weights will be used in the hidden state calculations
     output_size = y_train.shape[-1]  # Number of output features, same as input in this case
     pred_steps = steps_out # Number of future steps to predict
-    batch_size = 36 # How many windows are being processed per pass through the LSTM
+    batch_size = 8 # How many windows are being processed per pass through the LSTM
     learning_rate = 0.005
     num_epochs = 3000
     check_epochs = 100

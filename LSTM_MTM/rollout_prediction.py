@@ -62,7 +62,7 @@ fine_labels = {
 
 ####################################### ROLLOUT PREDICTION #####################################
 
-# Function to predict future values using rollout with the LSTM model
+# Predict future values using rollout procedure with trained LSTM model
 def rollout(model, input_seq, steps_out,total_steps):
     
     ## setting to eval mode and dropping gradient calculation for prediction
@@ -94,6 +94,7 @@ def rollout(model, input_seq, steps_out,total_steps):
 
 ####################################### PLOTTING FUN. #####################################
 
+# Plot training and validation results from LSTM's training stage (windowed data in batches)
 def plot_model_pred(model, model_name,features,set_labels,set,
                     X_data,true_data,wind_size,casebatch_len):
 
@@ -181,7 +182,7 @@ def plot_model_pred(model, model_name,features,set_labels,set,
         ax.grid(color='k', linestyle=':', linewidth=0.1)
         ax.tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', length=5, width=1.5)
 
-        fig.savefig(os.path.join(fig_savepath, f'Pred_{model_name}_{features[f_idx]}_{set}_set.png'), dpi=150)
+        fig.savefig(os.path.join(fig_savepath,'windowed',f'{model_name}', f'Pred_{model_name}_{features[f_idx]}_{set}_set.png'), dpi=150)
         plt.show()
 
     ## DSD Plotting if training data contains more features
@@ -230,9 +231,10 @@ def plot_model_pred(model, model_name,features,set_labels,set,
         fig2.supxlabel('Time steps',fontsize=30)
         fig2.supylabel('PD per DSD bin',fontsize=30)
         fig2.suptitle(f'Prediction with LSTM {model_name} for DSD {set} set',fontsize=40)
-        fig2.savefig(os.path.join(fig_savepath, f'Predall_{model_name}_DSD_{set}_set.png'), dpi=150)
+        fig2.savefig(os.path.join(fig_savepath, 'windowed',f'{model_name}',f'Predall_{model_name}_DSD_{set}_set.png'), dpi=150)
         plt.show()
-            
+
+# Plot rollout predictions from the LSTM for all trained features
 def plot_rollout_pred(rollout_seq, true_data, input_steps, features,set_labels, model_name):
 
     colors = sns.color_palette("hsv", len(set_labels))
@@ -240,7 +242,7 @@ def plot_rollout_pred(rollout_seq, true_data, input_steps, features,set_labels, 
     num_features = len(features)
 
     for f_idx in range(num_features):
-        fig = plt.figure(figsize=(12,6))
+        fig = plt.figure(figsize=(8,6))
 
         # looping through cases
         for i, case in enumerate(set_labels):
@@ -263,19 +265,19 @@ def plot_rollout_pred(rollout_seq, true_data, input_steps, features,set_labels, 
         
         plt.legend()
         plt.title(f'Rollout pred with LSTM {model_name} for: {features[f_idx]}')
-        plt.xlim(0, 110)
+        plt.xlim(0, 105)
         plt.ylim(0)
         plt.xlabel('Time steps')
         plt.ylabel(f'Scaled {features[f_idx]}')
         plt.grid(color='k', linestyle=':', linewidth=0.1)
         plt.tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', length=5, width=1.5)
 
-        fig.savefig(os.path.join(fig_savepath, f'Rollout_{model_name}_{features[f_idx]}.png'), dpi=150)
+        fig.savefig(os.path.join(fig_savepath,'rollouts',f'{model_name}', f'Rollout_{model_name}_{features[f_idx]}.png'), dpi=150)
         plt.show()
     
     if true_data.shape[-1] > 1:
         bin_idxs = num_features - 2
-        fig2,axes2 = plt.subplots(2,int(bin_idxs/2), figsize=(int(bin_idxs/2*5),5))
+        fig2,axes2 = plt.subplots(2,int(bin_idxs/2), figsize=(int(bin_idxs/2*6),10))
         fig2.tight_layout(rect=[0.05,0.02,1,0.9]) # [left, bottom, right, top]
         fig2.subplots_adjust(wspace=0.2)
 
@@ -309,14 +311,13 @@ def plot_rollout_pred(rollout_seq, true_data, input_steps, features,set_labels, 
         fig2.supxlabel('Time steps', fontsize=30)
         fig2.supylabel('PD per DSD bin', fontsize=30)
         fig2.suptitle(f'Rollout with LSTM {model_name} for DSD bins', fontsize=40)
-        fig2.savefig(os.path.join(fig_savepath, f'Rollout_{model_name}_DSD.png'), dpi=150)
+        fig2.savefig(os.path.join(fig_savepath,'rollouts',f'{model_name}', f'Rollout_{model_name}_DSD.png'), dpi=150)
         plt.show()
 
-# Functions to plot predictions including DSD
-
+# Plot DSD rollout predictions as histograms along time
 def plot_rollout_dist(rollout_seq, true_data, input_steps, set_labels, bin_edges, model_name):
     colors = sns.color_palette('muted', len(set_labels))
-    # comparion of temporal distributions
+    # comparison of temporal distributions
     fig1, axes1 = plt.subplots(2,1,figsize=(6,12))
     fig1.tight_layout(rect=[0,0,1,0.95])
     fig1.subplots_adjust(hspace=0.3)
@@ -356,7 +357,7 @@ def plot_rollout_dist(rollout_seq, true_data, input_steps, set_labels, bin_edges
 
         for seq,case in enumerate(set_labels):
             plot_label = fine_labels.get(case,case)
-            ## Wasserstain 
+
             try:
                 emd = wasserstein_distance(bin_edges, bin_edges, true_data[t,seq,2:], rollout_seq[seq,t,2:])
             except:
@@ -368,7 +369,7 @@ def plot_rollout_dist(rollout_seq, true_data, input_steps, set_labels, bin_edges
             axes1[0].set_title('Wasserstein value',fontweight='bold')
             axes1[0].set_xlabel('Time step',fontweight='bold')
             
-            ## Wasserstain 
+
             kl_PQ = kl_div(np.array(true_data[t,seq,2:]),np.array(rollout_seq[seq,t,2:])).sum()
             axes1[1].scatter(t_label, kl_PQ ,color = colors[seq % len(colors)],label=f'{plot_label}')
             axes1[1].set_xlim([40,105])
@@ -483,10 +484,13 @@ def main():
     ## Calling rollout prediction for test data
     rollout_seq = rollout(model,input_seq,hyperparams["steps_out"],total_steps)
 
-    #plot_rollout_pred(rollout_seq,test_arr, hyperparams['steps_in'], features,splitset_labels[2], model_choice)
+    plot_rollout_pred(rollout_seq,test_arr, hyperparams['steps_in'], features,splitset_labels[2], model_choice)
 
     if test_arr.shape[-1] > 2:
-        plot_rollout_dist(rollout_seq,test_arr, hyperparams['steps_in'], splitset_labels[2], bin_edges, model_choice)
+        t_evol_choice = input('plot DSD temporal evolution and K-L/Wasserstein metrics? (y/n): ')
+
+        if t_evol_choice.lower() == 'y':
+            plot_rollout_dist(rollout_seq,test_arr, hyperparams['steps_in'], splitset_labels[2], bin_edges, model_choice)
 
 if __name__ == "__main__":
     main()
