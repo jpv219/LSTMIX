@@ -73,8 +73,11 @@ fine_labels = {
     # smx cases #
     'b03': r'$\beta=0.3$','b06':r'$\beta=0.6$','bi001':r'$Bi=0.01$','bi01':r'$Bi=0.1$','da01': r'$Da=0.1$','da1':r'$Da=1$',
     'b06pm':r'$\beta_{pm}=0.6$,','b09pm':r'$\beta_{pm}=0.9$,','bi001pm':r'$Bi_{pm}=0.01$,',
-    'bi1':r'$Bi=1$','bi01pm':r'$Bi=0.1$,','3drop':r'3-Drop',
-    'b09':r'$\beta=0.9$','da01pm':r'$Da_{pm}=0.1$, ','da001':r'$Da=0.01$', 'coarsepm':r'Pre-Mix'
+    'bi1':r'$Bi=1$','bi01pm':r'$Bi_{pm}=0.1$,','3d':r'3-Drop',
+    'b09':r'$\beta=0.9$','da01pm':r'$Da_{pm}=0.1$, ','da001':r'$Da=0.01$', 'PM':r'Coarse Pre-Mix', 'FPM' : r'Fine Pre-Mix',
+    'alt1': r'Alt1', 'alt2': r'Alt2', 'alt3': r'Alt3', 'alt4': r'Alt4', 'alt1_b09': r'$\beta_{alt1 pm}=0.9$', 'alt4_b09':  r'$\beta_{alt4 pm}=0.9$',
+    'alt4_f': r'Alt4 Fine PM', 'b03a': r'$\beta_{alt4}=0.3$', 'b06a': r'$\beta_{alt4}=0.6$', 'b09a': r'$\beta_{alt4}=0.9$',
+    'bi1a': r'$Bi_{alt4}=1$', 'bi01a': r'$Bi_{alt4}=0.1$', 'bi001a': r'$Bi_{alt4}=0.01$'
 }
 
 ##################################### CLASSES #################################################
@@ -170,7 +173,7 @@ class Window_data():
             
             case_labels = train_cases if set_label == "Training" else val_cases if set_label == "Validation" else test_cases
 
-            t_indices = [70, 80, 90, 100]
+            t_indices = [65, 75, 85, 95]
             fig, axes = plt.subplots(2, 2, figsize=(12, 12))
             color_palette = color_palettes[set_label]
           
@@ -946,9 +949,9 @@ def main():
     if choice.lower() == 'y':
 
         ## Cases to split and features to read from 
-        Allcases = ['bi001', 'bi01', 'b09', 'b06pm', 'b03', 'da01pm', 'da01', 'bi01pm', '3drop',
-        'coarsepm', 'bi001pm', 'bi1',
-        'b06', 'b09pm', 'da1', 'da001']
+        Allcases = ['bi001', 'bi01', 'b09', 'b06pm', 'b03', 'da01pm', 'da01', 'bi01pm', '3d', 'alt1', 'alt4_b09','b03a','b09a','bi01a','bi1a',
+        'PM', 'bi001pm', 'bi1', 'alt3','alt1_b09','alt4_f','b06a',
+        'b06', 'b09pm', 'da1', 'da001','alt2','bi001a','FPM']
 
         #Random sampling
         cases = random.sample(Allcases,len(Allcases))

@@ -1,6 +1,5 @@
 ### LSTM tools for training
-### Author: Juan Pablo Valdes
-### Code adapted from Fuyue Liang LSTM for stirred vessels
+### Author: Juan Pablo Valdes and Fuyue Liang
 ### First commit: Oct, 2023
 ### Department of Chemical Engineering, Imperial College London
 #########################################################################################################################################################

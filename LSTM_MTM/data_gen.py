@@ -44,9 +44,9 @@ def main():
     if choice.lower() == 'y':
 
         ## Cases to split and features to read from 
-        Allcases = ['bi001', 'bi01', 'b09', 'b06pm', 'b03', 'da01pm', 'da01', 'bi01pm', '3drop',
-        'coarsepm', 'bi001pm', 'bi1',
-        'b06', 'b09pm', 'da1', 'da001']
+        Allcases = ['bi001', 'bi01', 'b09', 'b06pm', 'b03', 'da01pm', 'da01', 'bi01pm', '3d', 'alt1', 'alt4_b09','b03a','b09a','bi01a','bi1a',
+        'PM', 'bi001pm', 'bi1', 'alt3','alt1_b09','alt4_f','b06a',
+        'b06', 'b09pm', 'da1', 'da001','alt2','bi001a','FPM']
 
         # Random sampling
         cases = random.sample(Allcases,len(Allcases))

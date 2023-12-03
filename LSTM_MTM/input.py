@@ -29,6 +29,7 @@ import copy
 
 fig_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/figs/'
 input_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/input_data/'
+raw_datapath = '/home/jpv219/Documents/ML/LSTM_SMX/RawData'
 
 ## Plot setup
 
@@ -56,8 +57,11 @@ fine_labels = {
     # smx cases #
     'b03': r'$\beta=0.3$','b06':r'$\beta=0.6$','bi001':r'$Bi=0.01$','bi01':r'$Bi=0.1$','da01': r'$Da=0.1$','da1':r'$Da=1$',
     'b06pm':r'$\beta_{pm}=0.6$,','b09pm':r'$\beta_{pm}=0.9$,','bi001pm':r'$Bi_{pm}=0.01$,',
-    'bi1':r'$Bi=1$','bi01pm':r'$Bi=0.1$,','3drop':r'3-Drop',
-    'b09':r'$\beta=0.9$','da01pm':r'$Da_{pm}=0.1$, ','da001':r'$Da=0.01$', 'coarsepm':r'Pre-Mix'
+    'bi1':r'$Bi=1$','bi01pm':r'$Bi_{pm}=0.1$,','3d':r'3-Drop',
+    'b09':r'$\beta=0.9$','da01pm':r'$Da_{pm}=0.1$, ','da001':r'$Da=0.01$', 'PM':r'Coarse Pre-Mix', 'FPM' : r'Fine Pre-Mix',
+    'alt1': r'Alt1', 'alt2': r'Alt2', 'alt3': r'Alt3', 'alt4': r'Alt4', 'alt1_b09': r'$\beta_{alt1 pm}=0.9$', 'alt4_b09':  r'$\beta_{alt4 pm}=0.9$',
+    'alt4_f': r'Alt4 Fine PM', 'b03a': r'$\beta_{alt4}=0.3$', 'b06a': r'$\beta_{alt4}=0.6$', 'b09a': r'$\beta_{alt4}=0.9$',
+    'bi1a': r'$Bi_{alt4}=1$', 'bi01a': r'$Bi_{alt4}=0.1$', 'bi001a': r'$Bi_{alt4}=0.01$'
 }
 
 ##### CLASSES #####
@@ -69,12 +73,21 @@ class RawData_processing():
         
     ## load raw data per case from csv files
     def import_rawdata(self,case):
-        if case == '3drop' or case == 'coarsepm':
-            # If true, extract only volume array
+
+        file_name_gvol = os.path.join(raw_datapath,f"{case}_GVol.csv")
+        file_name_vol = os.path.join(raw_datapath,f"{case}_Vol.csv")
+
+    # Check if the files exist
+        if os.path.isfile(file_name_gvol):
+            # If true, extract volume and concentration arrays
+            df_Vol = Load_Clean_DF.extract_GVol(case)
+
+        elif os.path.isfile(file_name_vol):
+            # If false, extract only volume array
             df_Vol = Load_Clean_DF.extract_Vol(case)
         else:
-            # If false, extract volume and concentration arrays
-            df_Vol = Load_Clean_DF.extract_GVol(case)
+            # Handle the case where neither file exists
+            raise FileNotFoundError(f"Neither {file_name_gvol} nor {file_name_vol} found.")
         
         # Extract number of drops (Nd) and interfacial area (IntA)
         Nd = Load_Clean_DF.extract_Nd(case)
@@ -98,11 +111,14 @@ class RawData_processing():
             n_drops = Nd['Ndrops']
             IA = IntA['IA']
             DSD = df_Vol['Volume']
+
+            file_name_gvol = os.path.join(raw_datapath,f"{case}_GVol.csv")
+            file_name_vol = os.path.join(raw_datapath,f"{case}_Vol.csv")
             
             # Determine if case needs surf. conc. or clean
-            if case == '3drop' or case == 'coarsepm':
+            if os.path.isfile(file_name_vol):
                 G = []  # If true, set G as an empty list
-            else:
+            elif os.path.isfile(file_name_gvol):
                 G = df_Vol['Gammatilde']  # If false, extract G data
             
             ## Dictionary holding a dictionary per case for all extracted data from paraview
@@ -340,29 +356,30 @@ class Post_processing():
         'savgol': requires window_size, poly_order
         'lowess': requires lowess_frac
         '''
-
-        data = in_data[:,:,:2]
-
+        # Create a copy of the input data to avoid modifying the original array
+        data = np.copy(in_data)
+        # Extract the features to be smoothed
+        smoothed_features = data[:, :, :2]
         ## rolling window averaging method
         if method == 'moveavg':
             if window_size is None:
                 raise ValueError('Window size required')
-            smoothed_data = pd.DataFrame(data).rolling(window_size, axis = 0).mean()
-            smoothed_data.fillna(pd.DataFrame(data),inplace=True)
+            smoothed_data = pd.DataFrame(smoothed_features).rolling(window_size, axis = 0).mean()
+            smoothed_data.fillna(pd.DataFrame(smoothed_features),inplace=True)
         ## SavGol filter based on fitting least-squares polynomial to a window of data points
         elif method == 'savgol':
             if window_size is None or poly_order is None:
                 raise ValueError('Mising input arguments: Windowsize/polyorder')
             smoothed_data = np.apply_along_axis(
                         lambda col: savgol_filter(col, window_size, poly_order),
-                        axis = 0, arr=data)
+                        axis = 0, arr=smoothed_features)
         ## Locally Weighted Scatterplot Smoothing, locally fitting linear regressions
         elif method == 'lowess':
             if lowess_frac is None:
                 raise ValueError('Lowess fraction required')
             smoothed_data = np.apply_along_axis(
                         lambda col: lowess(col,np.arange(len(col)),frac = lowess_frac,return_sorted=False),
-                        axis = 0, arr = data)
+                        axis = 0, arr = smoothed_features)
         else:
             raise ValueError('Unsupported smoothing method')
         
@@ -370,9 +387,9 @@ class Post_processing():
         smoothed_columns = np.arange(smoothed_data.shape[-1])
 
         # Reassign the smoothed columns to the original data
-        in_data[:, :, smoothed_columns] = smoothed_data
-
-        return in_data
+        data[:, :, smoothed_columns] = smoothed_data
+        
+        return data
 
     #### PLOTS ####
 
@@ -446,7 +463,7 @@ class Post_processing():
 
     def plot_DSD(self,data,bin_edges,fine_labels,dpi=150):
         
-        t_indices = [70, 80, 90, 100]
+        t_indices = [65,75,85,95]
         fig, axes = plt.subplots(2, 2, figsize=(12, 12))
 
         for idx, t_idx in enumerate(t_indices):
@@ -506,9 +523,9 @@ def setup_DSD(n_bins,cases,feature_map,DSD_columns,pre_dict):
 
 def main():
 
-    Allcases = ['bi001', 'bi01', 'b09', 'b06pm', 'b03', 'da01pm', 'da01', 'bi01pm', '3drop',
-        'coarsepm', 'bi001pm', 'bi1',
-        'b06', 'b09pm', 'da1', 'da001']
+    Allcases = ['bi001', 'bi01', 'b09', 'b06pm', 'b03', 'da01pm', 'da01', 'bi01pm', '3d', 'alt1', 'alt4_b09','b03a','b09a','bi01a','bi1a',
+        'PM', 'bi001pm', 'bi1', 'alt3','alt1_b09','alt4_f','b06a',
+        'b06', 'b09pm', 'da1', 'da001','alt2','bi001a','FPM']
 
     # Randomizing cases for different train-test set splitting
     cases = random.sample(Allcases,len(Allcases))
