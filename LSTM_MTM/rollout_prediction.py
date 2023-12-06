@@ -45,7 +45,7 @@ plt.rc('axes', titlesize=BIGGER_SIZE)     # fontsize of the axes title
 plt.rc('axes', labelsize=BIGGER_SIZE)    # fontsize of the x and y labels
 plt.rc('xtick', labelsize=BIGGER_SIZE)    # fontsize of the tick labels
 plt.rc('ytick', labelsize=BIGGER_SIZE)    # fontsize of the tick labels
-plt.rc('legend', fontsize=MEDIUM_SIZE)    # legend fontsize
+plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 fine_labels = {
@@ -99,7 +99,7 @@ def rollout(model, input_seq, steps_out,total_steps):
 
 # Plot training and validation results from LSTM's training stage (windowed data in batches)
 def plot_model_pred(model, model_name,features,set_labels,set,
-                    X_data,true_data,wind_size,casebatch_len):
+                    X_data,true_data,wind_size,steps_out,casebatch_len):
 
     model.eval()
 
@@ -133,9 +133,9 @@ def plot_model_pred(model, model_name,features,set_labels,set,
                 axins.grid(color='k', linestyle=':', linewidth=0.1)
 
         s_idx = 0 # first element to choose from each row, per case
-        x_range = range(wind_size-31,len(true_data)-30)
+        x_range = range(wind_size-steps_out+1,len(true_data)- steps_out)
         s_idx_l = -1
-        x_range_l = range(wind_size-1,len(true_data))
+        x_range_l = range(wind_size,len(true_data)+1)
         
         # Loop over cases
         for seq, case in enumerate(set_labels):
@@ -387,6 +387,106 @@ def plot_rollout_dist(rollout_seq, true_data, input_steps, set_labels, bin_edges
         fig1.suptitle(f'Comparison between Target and Prediction from {model_name}',fontweight='bold')
         fig1.savefig(os.path.join(fig_savepath, 'temporal_EMD',model_name,f'EMD_{model_name}_DSD_{t}.png'), dpi=150)
 
+def plot_y_x(model, model_name,set_labels, features,
+                    X_data,true_data,casebatch_len,steps_in,steps_out,dpi=150):
+
+    model.eval()
+
+    # Retrieving final training and validation state from windowed X tensor
+    with torch.no_grad():
+        y_pred_data = model(X_data) # Y_tensor has shape [number of rows/windows for all cases, times in window, features], where the first dimension can be sorted by case with casebatch length  
+    
+    num_cases = len(set_labels)
+    num_windows = casebatch_len[0]
+    num_features = len(features)
+
+    colors = sns.color_palette("viridis", num_cases)
+
+    plt.figure(figsize=(10,8),dpi=dpi)
+
+    for spine in plt.gca().spines.values():
+        spine.set_linewidth(1.5)
+
+    
+
+
+    ## Looping by case
+    for seq, case in enumerate(set_labels):
+
+        plot_label = fine_labels.get(case,case)
+        label_added = False
+
+        ## Looping by features
+        for f_idx in range(num_features):
+
+            ## Looping by window time index
+            for win_tidx in range(0, steps_out):
+
+                if not label_added:
+                    if seq ==0:
+                        # True data idxs to match nth window element sequence for all windows (size of true data equals number of windows)
+                        start_idx = steps_in + win_tidx # start idx in true data extends for the number of steps out (elements in output window)
+                        end_idx = start_idx + num_windows # end_idx for true data guarantees a length of number of windows, plotting the nth element per window in every loop instance
+
+                        plt.plot(true_data[start_idx:end_idx,seq,f_idx], 
+                        y_pred_data[:casebatch_len[seq],win_tidx,f_idx],marker = 'o',linestyle = 'None', markersize = 2, color = colors[seq], label = plot_label)
+                        
+
+                    else:
+                        # True data start idx based on the window time idx plotted from y_pred
+                        start_idx = steps_in + win_tidx # start idx in true data extends for the number of steps out (elements in output window)
+                        end_idx = start_idx + num_windows # end_idx for true data guarantees a length of number of windows, plotting the nth element per window in every loop instance
+
+                        plt.plot(true_data[start_idx:end_idx,seq,f_idx], 
+                        y_pred_data[casebatch_len[seq-1]:casebatch_len[seq],win_tidx,f_idx],marker = 'o',linestyle = 'None', markersize = 2, color = colors[seq], label = plot_label)
+
+                    label_added = True
+
+                else:
+                    if seq ==0:
+                        # True data idxs to match nth window element sequence for all windows (size of true data equals number of windows)
+                        start_idx = steps_in + win_tidx # start idx in true data extends for the number of steps out (elements in output window)
+                        end_idx = start_idx + num_windows # end_idx for true data guarantees a length of number of windows, plotting the nth element per window in every loop instance
+
+                        plt.plot(true_data[start_idx:end_idx,seq,f_idx], 
+                        y_pred_data[:casebatch_len[seq],win_tidx,f_idx],marker = 'o',linestyle = 'None', markersize = 2, color = colors[seq])
+                        
+
+                    else:
+                        # True data start idx based on the window time idx plotted from y_pred
+                        start_idx = steps_in + win_tidx # start idx in true data extends for the number of steps out (elements in output window)
+                        end_idx = start_idx + num_windows # end_idx for true data guarantees a length of number of windows, plotting the nth element per window in every loop instance
+
+                        plt.plot(true_data[start_idx:end_idx,seq,f_idx], 
+                        y_pred_data[casebatch_len[seq-1]:casebatch_len[seq],win_tidx,f_idx],marker = 'o',linestyle = 'None', markersize = 2, color = colors[seq])
+
+            
+    ## Plot Y=X line and 15% deviation lines on top
+    x = np.linspace(0,1,100)
+    y = x
+    
+    pos_dev = 1.2*x
+    neg_dev = 0.8*x
+    plt.plot(x,y,label = 'x=y', color= 'k', linewidth = 2.5)
+    plt.plot(x,pos_dev,label = '+20%%', color = 'r', linewidth = 1.5, linestyle = '--')
+    plt.plot(x,neg_dev,label = '-20%%', color = 'r', linewidth = 1.5, linestyle = '--')
+    
+    plt.xlabel('True Data',fontsize=40,fontdict=dict(weight='bold'))
+    plt.ylabel('Predicted Data',fontsize=40,fontdict=dict(weight='bold'))
+    legend = plt.legend(ncol=2,title='Static Mixer',title_fontsize=15,fontsize=10,
+                    edgecolor='black', frameon=True)
+    for handle in legend.legendHandles:
+        handle.set_markersize(10)
+    plt.grid(color='k', linestyle=':', linewidth=1)
+    plt.tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', length=5, width=1.5)
+    plt.xticks(fontsize=30,fontweight='bold')
+    plt.yticks(fontsize=30)
+    plt.tight_layout()
+    plt.savefig(os.path.join(fig_savepath,'rollouts',f'{model_name}', f'y_x_disp_{model_name}.png'), dpi=200)
+    plt.show()
+
+    
+
 def main():
     
     # Reading saved re-shaped input data from file
@@ -470,10 +570,38 @@ def main():
 
         # using windowed tensors for plots to represent final training and validation state
         plot_model_pred(model, model_choice, features, splitset_labels[0],
-                        'Train',X_train, train_arr, wind_size, train_casebatch)
+                        'Train',X_train, train_arr, wind_size, hyperparams['steps_out'],train_casebatch)
         
         plot_model_pred(model, model_choice, features, splitset_labels[1],
-                'Validation',X_val, val_arr, wind_size, val_casebatch)
+                'Validation',X_val, val_arr, wind_size,hyperparams['steps_out'], val_casebatch)
+        
+    
+    ## Plotting pred. vs. true data dispersion in y=x plot
+    xy_choice = input('plot x=y fit curve for train and validation? (y/n) :')
+
+    if xy_choice.lower() == 'y' or xy_choice.lower() == 'yes':
+
+        X_train = windowed_tensors[0]
+        X_val = windowed_tensors[1]
+        train_arr = arrays[0]
+        val_arr = arrays[1]
+        train_casebatch = casebatches[0]
+        val_casebatch = casebatches[1]
+
+        ## Combining both train and val tensors, true arrays, casebatch arrays and labels to generate a single y=x plot
+        X_window_stack = torch.cat((X_train,X_val),dim=0)
+        true_data_stack = np.concatenate((train_arr,val_arr),axis = 1)
+
+        ## Correcting the val_casebatch to continue the sequence from the train_casebatch, capturing the correct number of concatenated windows in the train/val tensors
+        val_batch_corr = np.array([x + train_casebatch[-1] for x in val_casebatch])
+        X_casebatch_stack = np.concatenate((train_casebatch,val_batch_corr),axis = 0)
+
+        X_setlabels_stack = splitset_labels[0] + splitset_labels[1]
+
+        plot_y_x(model,model_choice,X_setlabels_stack,features,X_window_stack,
+                 true_data_stack,X_casebatch_stack,hyperparams['steps_in'],hyperparams['steps_out'])
+
+
 
     ## carry out rollout predictions on testing data sets
     test_arr = arrays[2]

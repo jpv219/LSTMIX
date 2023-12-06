@@ -235,6 +235,8 @@ class Window_data():
         X_array = np.array(X)
         y_array = np.array(y)
         
+        ## Dimensions of windowed tensors: [Windows for all cases (windows per case*cases), times per window (steps in or steps out depending on X/Y tensor), features]
+        # number of windows is determined via Tfinal - steps out - steps in + 1
         return torch.tensor(X_array), torch.tensor(y_array), np.array(casebatch_lens)
 
 class LSTM_DMS(nn.Module):
