@@ -1,6 +1,5 @@
 ### LSTM hyperparameter tuning
-### Author: Juan Pablo Valdes
-### Code adapted from Fuyue Liang LSTM for stirred vessels
+### Author: Juan Pablo Valdes and Fuyue Liang
 ### First commit: Oct, 2023
 ### Department of Chemical Engineering, Imperial College London
 #########################################################################################################################################################
@@ -29,15 +28,20 @@ import ray.cloudpickle as raypickle
 
 ## Env. variables ##
 
-# fig_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/figs/'
-# input_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/input_data/'
-# trainedmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/trained_models/'
-# tuning_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/tuning'
+#fig_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/figs/'
+#input_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/input_data/'
+#trainedmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/trained_models/'
+#tuning_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/tuning'
 
 fig_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/figs/'
 input_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/input_data/'
 trainedmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/trained_models/'
 tuningmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/tuning/'
+
+#fig_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/figs/'
+#input_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX//LSTM_MTM/input_data/'
+#trainedmod_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/trained_models'
+#tuningmod_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/tuning/'
 
 ########################################### METHODS ###########################################
 
@@ -221,14 +225,14 @@ def main():
         'DMS': {
             'hidden_size': tune.choice([2 ** i for i in range(6, 9)]),
             'learning_rate': tune.choice([0.005,0.01]),
-            'batch_size': tune.choice(range(10, 40, 5)),
+            'batch_size': tune.choice(range(8, 44, 4)),
             'training_prediction': tune.choice(['none']),
             'tf_ratio': tune.choice([0]),
             'dynamic_tf': tune.choice(['False']),
-            'l1_lambda': tune.choice([0, 0.00001, 0.0001]),
-            'l2_lambda': tune.choice([0, 0.00001, 0.0001]),
+            'l1_lambda': tune.choice([0, 0.00001]),
+            'l2_lambda': tune.choice([0, 0.00001]),
             'batch_loss': tune.choice(['False']),
-            'penalty_weight': tune.choice([0.1,1,10])
+            'penalty_weight': tune.choice([0.01,0.1,1,10])
         },
         'S2S': {
             'hidden_size': tune.choice([2 ** i for i in range(6, 9)]),
@@ -240,7 +244,7 @@ def main():
             'l1_lambda': tune.choice([0]),
             'l2_lambda': tune.choice([0]),
             'batch_loss': tune.choice(['False']),
-            'penalty_weight': tune.choice([0.1,1, 10])
+            'penalty_weight': tune.choice([0.01,0.1,1, 10])
         }
     }
 
@@ -251,8 +255,8 @@ def main():
         "input_size": X_tens[0].shape[-1],
         "output_size": y_tens[0].shape[-1],
         "pred_steps": 30,
-        "num_epochs": 100,
-        "check_epochs": 20
+        "num_epochs": 150,
+        "check_epochs": 30
     }
 
     # Configure and run RAY TUNING 
@@ -266,7 +270,7 @@ def main():
 
     ray.shutdown()
     ray.init(num_cpus=num_cpus_to_allocate)
-    num_samples = 1800
+    num_samples = 1728
     log_file_path = os.path.join(tuningmod_savepath,model_choice,f'logs/{model_choice}_tune_out.log')
 
     # Run the experiment

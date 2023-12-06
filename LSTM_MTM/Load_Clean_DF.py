@@ -17,7 +17,7 @@ def extract_GVol(elem):
 ### Generate dataframe with number of drops
 def extract_Nd(elem):
     Nd_csv_file = os.path.join(global_dir,'Nd',f'{elem}_dnum_corr.csv')
-    df = pd.read_csv(Nd_csv_file)
+    df = pd.read_csv(Nd_csv_file,header=None)
     label_list = list(df.columns.values)
     df.rename(columns={label_list[0]: 'Ndrops'}, inplace = True)
     df['Time'] = df.apply(lambda row: row.name*0.005,axis=1)
@@ -26,8 +26,8 @@ def extract_Nd(elem):
 
 ### Generate dataframe with interfacial area
 def extract_IA(elem):
-    Nd_csv_file = os.path.join(global_dir,'IA',f'{elem}_IA_corr.csv')
-    df = pd.read_csv(Nd_csv_file)
+    IA_csv_file = os.path.join(global_dir,'IA',f'{elem}_IA_corr.csv')
+    df = pd.read_csv(IA_csv_file,header=None)
     label_list = list(df.columns.values)
     df.rename(columns={label_list[0]: 'IA'}, inplace = True)
     df['Time'] = df.apply(lambda row: row.name*0.005,axis=1)
