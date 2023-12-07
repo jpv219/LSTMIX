@@ -109,7 +109,11 @@ def plot_model_pred(model, model_name,features,set_labels,set,
 
     num_features = len(features)
     num_cases = len(set_labels)
-    colors = sns.color_palette("husl", num_cases)
+    cmap = sns.color_palette("RdBu", len(set_labels))
+    colors = cmap[::1][:len(set_labels)]
+
+    if set == 'Validation':
+        colors = cmap[::2][:len(set_labels)]
 
     # Loop over features
     for f_idx in range(num_features):
@@ -133,7 +137,7 @@ def plot_model_pred(model, model_name,features,set_labels,set,
                 axins.grid(color='k', linestyle=':', linewidth=0.1)
 
         s_idx = 0 # first element to choose from each row, per case
-        x_range = range(wind_size-steps_out+1,len(true_data)- steps_out)
+        x_range = range(wind_size-steps_out,len(true_data)- steps_out+1)
         s_idx_l = -1
         x_range_l = range(wind_size,len(true_data)+1)
         
@@ -240,7 +244,8 @@ def plot_model_pred(model, model_name,features,set_labels,set,
 # Plot rollout predictions from the LSTM for all trained features
 def plot_rollout_pred(rollout_seq, true_data, input_steps, features,set_labels, model_name):
 
-    colors = sns.color_palette("hsv", len(set_labels))
+    cmap = sns.color_palette("RdBu", len(set_labels))
+    colors = cmap[::2][:len(set_labels)]
 
     num_features = len(features)
 
@@ -319,7 +324,7 @@ def plot_rollout_pred(rollout_seq, true_data, input_steps, features,set_labels, 
 
 # Plot DSD rollout predictions as histograms along time
 def plot_rollout_dist(rollout_seq, true_data, input_steps, set_labels, bin_edges, model_name):
-    colors = sns.color_palette('muted', len(set_labels))
+    colors = sns.color_palette('RdBu', len(set_labels))
     # comparison of temporal distributions
     fig1, axes1 = plt.subplots(2,1,figsize=(6,12))
     fig1.tight_layout(rect=[0,0,1,0.95])
@@ -387,6 +392,7 @@ def plot_rollout_dist(rollout_seq, true_data, input_steps, set_labels, bin_edges
         fig1.suptitle(f'Comparison between Target and Prediction from {model_name}',fontweight='bold')
         fig1.savefig(os.path.join(fig_savepath, 'temporal_EMD',model_name,f'EMD_{model_name}_DSD_{t}.png'), dpi=150)
 
+# y_x error dispersion for training/validation
 def plot_y_x(model, model_name,set_labels, features,
                     X_data,true_data,casebatch_len,steps_in,steps_out,dpi=150):
 
@@ -407,9 +413,6 @@ def plot_y_x(model, model_name,set_labels, features,
     for spine in plt.gca().spines.values():
         spine.set_linewidth(1.5)
 
-    
-
-
     ## Looping by case
     for seq, case in enumerate(set_labels):
 
@@ -429,7 +432,9 @@ def plot_y_x(model, model_name,set_labels, features,
                         end_idx = start_idx + num_windows # end_idx for true data guarantees a length of number of windows, plotting the nth element per window in every loop instance
 
                         plt.plot(true_data[start_idx:end_idx,seq,f_idx], 
-                        y_pred_data[:casebatch_len[seq],win_tidx,f_idx],marker = 'o',linestyle = 'None', markersize = 2, color = colors[seq], label = plot_label)
+                        y_pred_data[:casebatch_len[seq],win_tidx,f_idx],
+                        marker = 'o',linestyle = 'None', markersize = 2, 
+                        color = colors[seq], label = plot_label)
                         
 
                     else:
@@ -438,7 +443,9 @@ def plot_y_x(model, model_name,set_labels, features,
                         end_idx = start_idx + num_windows # end_idx for true data guarantees a length of number of windows, plotting the nth element per window in every loop instance
 
                         plt.plot(true_data[start_idx:end_idx,seq,f_idx], 
-                        y_pred_data[casebatch_len[seq-1]:casebatch_len[seq],win_tidx,f_idx],marker = 'o',linestyle = 'None', markersize = 2, color = colors[seq], label = plot_label)
+                        y_pred_data[casebatch_len[seq-1]:casebatch_len[seq],win_tidx,f_idx],
+                        marker = 'o',linestyle = 'None', markersize = 2, 
+                        color = colors[seq], label = plot_label)
 
                     label_added = True
 
@@ -471,6 +478,7 @@ def plot_y_x(model, model_name,set_labels, features,
     plt.plot(x,pos_dev,label = '+20%%', color = 'r', linewidth = 1.5, linestyle = '--')
     plt.plot(x,neg_dev,label = '-20%%', color = 'r', linewidth = 1.5, linestyle = '--')
     
+    ## Plot configuration and styling
     plt.xlabel('True Data',fontsize=40,fontdict=dict(weight='bold'))
     plt.ylabel('Predicted Data',fontsize=40,fontdict=dict(weight='bold'))
     legend = plt.legend(ncol=2,title='Static Mixer',title_fontsize=15,fontsize=10,
@@ -482,10 +490,57 @@ def plot_y_x(model, model_name,set_labels, features,
     plt.xticks(fontsize=30,fontweight='bold')
     plt.yticks(fontsize=30)
     plt.tight_layout()
-    plt.savefig(os.path.join(fig_savepath,'rollouts',f'{model_name}', f'y_x_disp_{model_name}.png'), dpi=200)
+
+    plt.savefig(os.path.join(fig_savepath,'windowed',f'{model_name}', f'y_x_disp_{model_name}.png'), dpi=200)
     plt.show()
 
+# y_x error dispersion for rollout predictions
+def plot_rollout_yx(rollout_seq, true_data, input_steps, set_labels, features, model_name,dpi=200):
+
+    colors = sns.color_palette("magma", len(set_labels))
+    num_features = len(features)
+
+    plt.figure(figsize=(10,8), dpi=dpi)
+
+    for spine in plt.gca().spines.values():
+        spine.set_linewidth(1.5)
+
+    for seq, case in enumerate(set_labels):
+
+        plot_label = fine_labels.get(case,case)
+
+        for f_idx in range(num_features):
+
+            plt.plot(true_data[input_steps:,seq,f_idx],rollout_seq[seq,input_steps:len(true_data),f_idx], 
+                 marker = 'o', linestyle = 'None', markersize = 2, color = colors[seq],
+                 label=plot_label if f_idx == 0 else "")
+
+    ## Plot Y=X line and 15% deviation lines on top
+    x = np.linspace(0,1,100)
+    y = x
     
+    pos_dev = 1.2*x
+    neg_dev = 0.8*x
+    plt.plot(x,y,label = 'x=y', color= 'k', linewidth = 2.5)
+    plt.plot(x,pos_dev,label = '+20%%', color = 'b', linewidth = 2, linestyle = '--')
+    plt.plot(x,neg_dev,label = '-20%%', color = 'b', linewidth = 2, linestyle = '--')
+
+    ## Plot configuration and styling
+    plt.xlabel('True Data',fontsize=40,fontdict=dict(weight='bold'))
+    plt.ylabel('Predicted Data',fontsize=40,fontdict=dict(weight='bold'))
+
+    legend = plt.legend(ncol=2,title='Static Mixer',title_fontsize=15,fontsize=10,
+                    edgecolor='black', frameon=True)
+    for handle in legend.legendHandles:
+        handle.set_markersize(10)
+    plt.grid(color='k', linestyle=':', linewidth=1)
+    plt.tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', length=5, width=1.5)
+    plt.xticks(fontsize=30,fontweight='bold')
+    plt.yticks(fontsize=30)
+    plt.tight_layout()
+
+    plt.savefig(os.path.join(fig_savepath,'rollouts',f'{model_name}', f'y_x_roll_disp_{model_name}.png'), dpi=200)
+    plt.show()   
 
 def main():
     
@@ -615,8 +670,13 @@ def main():
     ## Calling rollout prediction for test data
     rollout_seq = rollout(model,input_seq,hyperparams["steps_out"],total_steps)
 
+    ## Plotting rollout sequences and yx error dispersion for all features
+
+    plot_rollout_yx(rollout_seq,test_arr,hyperparams['steps_in'],splitset_labels[2],features, model_choice)
+    
     plot_rollout_pred(rollout_seq,test_arr, hyperparams['steps_in'], features,splitset_labels[2], model_choice)
 
+    ## If DSD bins have been included as features, on top of Nd and IA
     if test_arr.shape[-1] > 2:
         t_evol_choice = input('plot DSD temporal evolution and K-L/Wasserstein metrics? (y/n): ')
 

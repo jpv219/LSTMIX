@@ -70,7 +70,7 @@ def perturbation(num_pertb, pertb_scale, input_seq):
     pertb_seqs = []
     for _ in range(num_pertb):
 
-        pertb = np.random.uniform(low=0, high=pertb_scale, size=input_seq.shape)
+        pertb = np.random.uniform(low=-pertb_scale, high=pertb_scale, size=input_seq.shape)
         pertb_seq = input_seq + pertb
         pertb_seqs.append(pertb_seq)
         
@@ -113,11 +113,13 @@ def plot_ensem_pred(model_name,features,scale,c_idx, case_label,
 
     # Loop over features
     for f_idx in range(num_features):
-        fig = plt.figure(figsize=(12,6))
+        fig = plt.figure(figsize=(12,8))
         '''
         display r2_score between target and original prediction 
         plot target, predictions from original input, predictions from perturbed.
         '''
+        for spine in plt.gca().spines.values():
+            spine.set_linewidth(3)
 
         plot_label = fine_labels.get(case_label,case_label)
 
@@ -156,7 +158,11 @@ def plot_ensem_uncertainty(model_name,features,scale,c_idx, case_label,
         '''
         plot target, original prediction, mean prediction, prediction interval
         '''
-        fig = plt.figure(figsize=(12,6))
+        fig = plt.figure(figsize=(12,8))
+
+        for spine in plt.gca().spines.values():
+            spine.set_linewidth(3)
+        
         plt.plot(true_data[:,c_idx,f_idx], color = col[0], lw=3, label=r'Target')
         plt.plot(rollout_ref[0,:,f_idx], color = col[1], linestyle='--', lw=3, label=r'Ref rollout')
         plt.plot(rollouts_pertb_mean[:, f_idx], 's',markersize=5,markerfacecolor='tab:red',
