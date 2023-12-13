@@ -394,7 +394,7 @@ def plot_rollout_dist(rollout_seq, true_data, input_steps, set_labels, bin_edges
 
 # y_x error dispersion for training/validation
 def plot_y_x(model, model_name,set_labels, features,
-                    X_data,true_data,casebatch_len,steps_in,steps_out,dpi=150):
+                    X_data,true_data,casebatch_len,steps_in,steps_out,type='combined',dpi=150):
 
     model.eval()
 
@@ -481,17 +481,17 @@ def plot_y_x(model, model_name,set_labels, features,
     ## Plot configuration and styling
     plt.xlabel('True Data',fontsize=40,fontdict=dict(weight='bold'))
     plt.ylabel('Predicted Data',fontsize=40,fontdict=dict(weight='bold'))
-    legend = plt.legend(ncol=2,title='Static Mixer',title_fontsize=15,fontsize=10,
-                    edgecolor='black', frameon=True)
-    for handle in legend.legendHandles:
-        handle.set_markersize(10)
+    #legend = plt.legend(ncol=2,title='Static Mixer',title_fontsize=18,fontsize=13,
+                    #edgecolor='black', frameon=True)
+    #for handle in legend.legendHandles:
+        #handle.set_markersize(10)
     plt.grid(color='k', linestyle=':', linewidth=1)
     plt.tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', length=5, width=1.5)
     plt.xticks(fontsize=30,fontweight='bold')
     plt.yticks(fontsize=30)
     plt.tight_layout()
 
-    plt.savefig(os.path.join(fig_savepath,'windowed',f'{model_name}', f'y_x_disp_{model_name}.png'), dpi=200)
+    plt.savefig(os.path.join(fig_savepath,'windowed',f'{model_name}', f'y_x_{type}_{model_name}.png'), dpi=200)
     plt.show()
 
 # y_x error dispersion for rollout predictions
@@ -529,10 +529,10 @@ def plot_rollout_yx(rollout_seq, true_data, input_steps, set_labels, features, m
     plt.xlabel('True Data',fontsize=40,fontdict=dict(weight='bold'))
     plt.ylabel('Predicted Data',fontsize=40,fontdict=dict(weight='bold'))
 
-    legend = plt.legend(ncol=2,title='Static Mixer',title_fontsize=15,fontsize=10,
-                    edgecolor='black', frameon=True)
-    for handle in legend.legendHandles:
-        handle.set_markersize(10)
+    #legend = plt.legend(ncol=2,title='Static Mixer',title_fontsize=22,fontsize=16,
+                    #edgecolor='black', frameon=True)
+    #for handle in legend.legendHandles:
+        #handle.set_markersize(10)
     plt.grid(color='k', linestyle=':', linewidth=1)
     plt.tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', length=5, width=1.5)
     plt.xticks(fontsize=30,fontweight='bold')
@@ -632,7 +632,7 @@ def main():
         
     
     ## Plotting pred. vs. true data dispersion in y=x plot
-    xy_choice = input('plot x=y fit curve for train and validation? (y/n) :')
+    xy_choice = input('plot x=y fit curve for train and validation together? (y/n) :')
 
     if xy_choice.lower() == 'y' or xy_choice.lower() == 'yes':
 
@@ -655,7 +655,21 @@ def main():
 
         plot_y_x(model,model_choice,X_setlabels_stack,features,X_window_stack,
                  true_data_stack,X_casebatch_stack,hyperparams['steps_in'],hyperparams['steps_out'])
+    
+    else:
 
+        X_train = windowed_tensors[0]
+        X_val = windowed_tensors[1]
+        train_arr = arrays[0]
+        val_arr = arrays[1]
+        train_casebatch = casebatches[0]
+        val_casebatch = casebatches[1]
+
+        plot_y_x(model,model_choice,splitset_labels[0],features,X_train,
+                 train_arr,train_casebatch,hyperparams['steps_in'],hyperparams['steps_out'],type='train')
+        
+        plot_y_x(model,model_choice,splitset_labels[1],features,X_val,
+                 val_arr,val_casebatch,hyperparams['steps_in'],hyperparams['steps_out'],type='val')
 
 
     ## carry out rollout predictions on testing data sets
