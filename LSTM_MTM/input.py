@@ -253,7 +253,7 @@ class DSD_processing():
                 ## targeting only keys corresponding to bins
                 if key.startswith('b'):
                     ## calculate prob density estimation per bin: prob_dens is a list containing bin arrays.
-                    prob_dens.append(np.where(f_pre_dict[case]['Nd']>0, f_pre_dict[case][key]/f_pre_dict[case]['Nd']*bin_width,0))
+                    prob_dens.append(np.where(f_pre_dict[case]['Nd']>0, f_pre_dict[case][key]/(f_pre_dict[case]['Nd']*bin_width),0))
 
             ## Calculate cumulative density values for all bins per time: element-wise addition of all bins per time
             cum_dens = np.zeros_like(prob_dens[0])

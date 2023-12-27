@@ -406,6 +406,9 @@ def plot_y_x(model, model_name,set_labels, features,
     num_windows = casebatch_len[0]
     num_features = len(features)
 
+    ground_truth =[]
+    predictions = []
+
     colors = sns.color_palette("viridis", num_cases)
 
     plt.figure(figsize=(10,8),dpi=dpi)
@@ -435,6 +438,9 @@ def plot_y_x(model, model_name,set_labels, features,
                         y_pred_data[:casebatch_len[seq],win_tidx,f_idx],
                         marker = 'o',linestyle = 'None', markersize = 2, 
                         color = colors[seq], label = plot_label)
+
+                        ground_truth.append(true_data[start_idx:end_idx,seq,f_idx])
+                        predictions.append(y_pred_data[:casebatch_len[seq],win_tidx,f_idx])
                         
 
                     else:
@@ -447,6 +453,9 @@ def plot_y_x(model, model_name,set_labels, features,
                         marker = 'o',linestyle = 'None', markersize = 2, 
                         color = colors[seq], label = plot_label)
 
+                        ground_truth.append(true_data[start_idx:end_idx,seq,f_idx])
+                        predictions.append(y_pred_data[casebatch_len[seq-1]:casebatch_len[seq],win_tidx,f_idx])
+
                     label_added = True
 
                 else:
@@ -458,6 +467,9 @@ def plot_y_x(model, model_name,set_labels, features,
                         plt.plot(true_data[start_idx:end_idx,seq,f_idx], 
                         y_pred_data[:casebatch_len[seq],win_tidx,f_idx],marker = 'o',linestyle = 'None', markersize = 2, color = colors[seq])
                         
+                        ground_truth.append(true_data[start_idx:end_idx,seq,f_idx])
+                        predictions.append(y_pred_data[:casebatch_len[seq],win_tidx,f_idx])
+                        
 
                     else:
                         # True data start idx based on the window time idx plotted from y_pred
@@ -467,7 +479,23 @@ def plot_y_x(model, model_name,set_labels, features,
                         plt.plot(true_data[start_idx:end_idx,seq,f_idx], 
                         y_pred_data[casebatch_len[seq-1]:casebatch_len[seq],win_tidx,f_idx],marker = 'o',linestyle = 'None', markersize = 2, color = colors[seq])
 
+                        ground_truth.append(true_data[start_idx:end_idx,seq,f_idx])
+                        predictions.append(y_pred_data[casebatch_len[seq-1]:casebatch_len[seq],win_tidx,f_idx])
+
             
+    ## Calculate MSE between ground truth and predictions
+    truth_tensor = [torch.tensor(arr) for arr in ground_truth]
+
+    cat_truth = torch.cat(truth_tensor)
+    cat_pred = torch.cat(predictions)
+
+    mse = torch.mean((cat_truth-cat_pred)**2).item()
+    r2 = r2_score(cat_truth, cat_pred)
+
+    print(f"Mean Squared Error for the {type} dataset using {model_name}: {mse}")
+    print(f"R^2 for the {type} dataset using {model_name}: {r2}")
+
+    
     ## Plot Y=X line and 15% deviation lines on top
     x = np.linspace(0,1,100)
     y = x
@@ -481,10 +509,10 @@ def plot_y_x(model, model_name,set_labels, features,
     ## Plot configuration and styling
     plt.xlabel('True Data',fontsize=40,fontdict=dict(weight='bold'))
     plt.ylabel('Predicted Data',fontsize=40,fontdict=dict(weight='bold'))
-    #legend = plt.legend(ncol=2,title='Static Mixer',title_fontsize=18,fontsize=13,
-                    #edgecolor='black', frameon=True)
-    #for handle in legend.legendHandles:
-        #handle.set_markersize(10)
+    legend = plt.legend(ncol=2,title='Static Mixer',title_fontsize=18,fontsize=13,
+                    edgecolor='black', frameon=True)
+    for handle in legend.legendHandles:
+        handle.set_markersize(10)
     plt.grid(color='k', linestyle=':', linewidth=1)
     plt.tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', length=5, width=1.5)
     plt.xticks(fontsize=30,fontweight='bold')
@@ -529,10 +557,10 @@ def plot_rollout_yx(rollout_seq, true_data, input_steps, set_labels, features, m
     plt.xlabel('True Data',fontsize=40,fontdict=dict(weight='bold'))
     plt.ylabel('Predicted Data',fontsize=40,fontdict=dict(weight='bold'))
 
-    #legend = plt.legend(ncol=2,title='Static Mixer',title_fontsize=22,fontsize=16,
-                    #edgecolor='black', frameon=True)
-    #for handle in legend.legendHandles:
-        #handle.set_markersize(10)
+    legend = plt.legend(ncol=2,title='Static Mixer',title_fontsize=22,fontsize=16,
+                    edgecolor='black', frameon=True)
+    for handle in legend.legendHandles:
+        handle.set_markersize(10)
     plt.grid(color='k', linestyle=':', linewidth=1)
     plt.tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', length=5, width=1.5)
     plt.xticks(fontsize=30,fontweight='bold')

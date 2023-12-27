@@ -997,10 +997,10 @@ def main():
 
     # Define hyperparameters
     input_size = X_train.shape[-1]  # Number of features in the input tensor
-    hidden_size = 64  # Number of hidden units in the LSTM cell, determines how many weights will be used in the hidden state calculations
+    hidden_size = 128  # Number of hidden units in the LSTM cell, determines how many weights will be used in the hidden state calculations
     output_size = y_train.shape[-1]  # Number of output features, same as input in this case
     pred_steps = steps_out # Number of future steps to predict
-    batch_size = 8 # How many windows are being processed per pass through the LSTM
+    batch_size = 36 # How many windows are being processed per pass through the LSTM
     learning_rate = 0.005
     num_epochs = 3000
     check_epochs = 100
@@ -1020,7 +1020,7 @@ def main():
     if model_choice == 'DMS':
         # LSTM model instance
         model = LSTM_DMS(input_size, hidden_size, output_size, pred_steps,
-                            l1_lambda=0.00, l2_lambda=0.00)
+                            l1_lambda=0.00, l2_lambda=1e-5)
         
         optimizer = optim.Adam(model.parameters(), lr = learning_rate) # optimizer to estimate weights and biases (backpropagation)
             
