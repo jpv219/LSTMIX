@@ -526,6 +526,9 @@ def plot_y_x(model, model_name,set_labels, features,
 def plot_rollout_yx(rollout_seq, true_data, input_steps, set_labels, features, model_name,dpi=200, train_val = None):
 
     num_cases = len(set_labels)
+
+    ground_truth = []
+    predictions = []
     
     ## change palette if training yx for the train and validation cases
     if train_val == 'train' or train_val == 'val':
@@ -548,8 +551,28 @@ def plot_rollout_yx(rollout_seq, true_data, input_steps, set_labels, features, m
             plt.plot(true_data[input_steps:,seq,f_idx],rollout_seq[seq,input_steps:len(true_data),f_idx], 
                  marker = 'o', linestyle = 'None', markersize = 2, color = colors[seq],
                  label=plot_label if f_idx == 0 else "")
+            
+            ground_truth.append(true_data[input_steps:,seq,f_idx])
+            predictions.append(rollout_seq[seq,input_steps:len(true_data),f_idx])
+        
+    truth_tensor = [torch.tensor(arr) for arr in ground_truth]
 
-    ## Plot Y=X line and 15% deviation lines on top
+    cat_truth = torch.cat(truth_tensor)
+    cat_pred = torch.cat(predictions)
+    
+    ## Calculating MSE and R2 for the rollout predictions
+    mse = torch.mean((cat_truth-cat_pred)**2).item()
+    r2 = r2_score(cat_truth, cat_pred)
+
+    if train_val == 'train' or train_val == 'val':
+        set = train_val
+    else:
+        set = 'test'
+
+    print(f"Mean Squared Error for the {set} dataset using {model_name}: {mse}")
+    print(f"R^2 for the {set} dataset using {model_name}: {r2}")
+    
+    ## Plot Y=X line and 20% deviation lines on top
     x = np.linspace(0,1,100)
     y = x
     
