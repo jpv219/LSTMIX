@@ -523,9 +523,15 @@ def plot_y_x(model, model_name,set_labels, features,
     plt.show()
 
 # y_x error dispersion for rollout predictions
-def plot_rollout_yx(rollout_seq, true_data, input_steps, set_labels, features, model_name,dpi=200):
+def plot_rollout_yx(rollout_seq, true_data, input_steps, set_labels, features, model_name,dpi=200, train_val = None):
 
-    colors = sns.color_palette("magma", len(set_labels))
+    num_cases = len(set_labels)
+    
+    ## change palette if training yx for the train and validation cases
+    if train_val == 'train' or train_val == 'val':
+        colors = sns.color_palette("viridis", num_cases)
+    
+    colors = sns.color_palette("magma", num_cases)
     num_features = len(features)
 
     plt.figure(figsize=(10,8), dpi=dpi)
@@ -567,7 +573,9 @@ def plot_rollout_yx(rollout_seq, true_data, input_steps, set_labels, features, m
     plt.yticks(fontsize=30)
     plt.tight_layout()
 
-    plt.savefig(os.path.join(fig_savepath,'rollouts',f'{model_name}', f'y_x_roll_disp_{model_name}.png'), dpi=200)
+    if train_val == 'train' or train_val == 'val':
+        plt.savefig(os.path.join(fig_savepath,'rollouts',f'{model_name}', f'y_x_roll_{train_val}_{model_name}.png'), dpi=200)
+    plt.savefig(os.path.join(fig_savepath,'rollouts',f'{model_name}', f'y_x_roll_{model_name}.png'), dpi=200)
     plt.show()   
 
 def main():
@@ -711,6 +719,23 @@ def main():
 
     ## Calling rollout prediction for test data
     rollout_seq = rollout(model,input_seq,hyperparams["steps_out"],total_steps)
+
+    ## Calling rollout on training and validation data
+
+    input_train = train_arr[:hyperparams['steps_in'],:,:]
+    input_val = val_arr[:hyperparams['steps_in'],:,:]
+
+    rollout_train = rollout(model,input_train,hyperparams['steps_out'],total_steps)
+    rollout_val = rollout(model,input_val,hyperparams['steps_out'],total_steps)
+
+    ## Plotting yx on train and val rollouts
+
+    xy_trainval_choice = input('Plot y=x for train and validation rollouts? (y/n): ')
+
+    if xy_trainval_choice.lower() == 'y' or xy_trainval_choice.lower() == 'yes':
+        plot_rollout_yx(rollout_train,train_arr,hyperparams['steps_in'],splitset_labels[0],features,model_choice,train_val='train')
+
+        plot_rollout_yx(rollout_val,val_arr,hyperparams['steps_in'],splitset_labels[1],features,model_choice,train_val='val')
 
     ## Plotting rollout sequences and yx error dispersion for all features
 
