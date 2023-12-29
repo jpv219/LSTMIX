@@ -526,6 +526,7 @@ def plot_y_x(model, model_name,set_labels, features,
 def plot_rollout_yx(rollout_seq, true_data, input_steps, set_labels, features, model_name,dpi=200, train_val = None):
 
     num_cases = len(set_labels)
+    num_features = len(features)
 
     ground_truth = []
     predictions = []
@@ -533,9 +534,9 @@ def plot_rollout_yx(rollout_seq, true_data, input_steps, set_labels, features, m
     ## change palette if training yx for the train and validation cases
     if train_val == 'train' or train_val == 'val':
         colors = sns.color_palette("viridis", num_cases)
-    
-    colors = sns.color_palette("magma", num_cases)
-    num_features = len(features)
+
+    else:
+        colors = sns.color_palette("magma", num_cases)
 
     plt.figure(figsize=(10,8), dpi=dpi)
 
@@ -566,8 +567,10 @@ def plot_rollout_yx(rollout_seq, true_data, input_steps, set_labels, features, m
 
     if train_val == 'train' or train_val == 'val':
         set = train_val
+        col = 'r'
     else:
         set = 'test'
+        col = 'b'
 
     print(f"Mean Squared Error for the {set} dataset using {model_name}: {mse}")
     print(f"R^2 for the {set} dataset using {model_name}: {r2}")
@@ -579,8 +582,8 @@ def plot_rollout_yx(rollout_seq, true_data, input_steps, set_labels, features, m
     pos_dev = 1.2*x
     neg_dev = 0.8*x
     plt.plot(x,y,label = 'x=y', color= 'k', linewidth = 2.5)
-    plt.plot(x,pos_dev,label = '+20%%', color = 'b', linewidth = 2, linestyle = '--')
-    plt.plot(x,neg_dev,label = '-20%%', color = 'b', linewidth = 2, linestyle = '--')
+    plt.plot(x,pos_dev,label = '+20%%', color = col, linewidth = 2, linestyle = '--')
+    plt.plot(x,neg_dev,label = '-20%%', color = col, linewidth = 2, linestyle = '--')
 
     ## Plot configuration and styling
     plt.xlabel('True Data',fontsize=40,fontdict=dict(weight='bold'))
