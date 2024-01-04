@@ -563,6 +563,8 @@ def plot_rollout_yx(rollout_seq, true_data, input_steps, set_labels, features, m
     
     ## Calculating MSE and R2 for the rollout predictions
     mse = torch.mean((cat_truth-cat_pred)**2).item()
+    rmse = mse**0.5
+    mae = torch.abs(cat_truth-cat_pred).mean().item()
     r2 = r2_score(cat_truth, cat_pred)
 
     if train_val == 'train' or train_val == 'val':
@@ -572,7 +574,9 @@ def plot_rollout_yx(rollout_seq, true_data, input_steps, set_labels, features, m
         set = 'test'
         col = 'b'
 
-    print(f"Mean Squared Error for the {set} dataset using {model_name}: {mse}")
+    print(f"MSE for the {set} dataset using {model_name}: {mse}")
+    print(f"MAE for the {set} dataset using {model_name}: {mae}")
+    print(f"RMSE for the {set} dataset using {model_name}: {rmse}")
     print(f"R^2 for the {set} dataset using {model_name}: {r2}")
     
     ## Plot Y=X line and 20% deviation lines on top
@@ -589,7 +593,7 @@ def plot_rollout_yx(rollout_seq, true_data, input_steps, set_labels, features, m
     plt.xlabel('True Data',fontsize=40,fontdict=dict(weight='bold'))
     plt.ylabel('Predicted Data',fontsize=40,fontdict=dict(weight='bold'))
 
-    legend = plt.legend(ncol=2,title='Static Mixer',title_fontsize=22,fontsize=16,
+    legend = plt.legend(ncol=2,title='Static Mixer',title_fontsize=20,fontsize=14,
                     edgecolor='black', frameon=True)
     for handle in legend.legendHandles:
         handle.set_markersize(10)
