@@ -40,7 +40,7 @@ import ray.cloudpickle as raypickle
 
 fig_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/figs/'
 input_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/input_data/'
-trainedmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/trained_svmodels/'
+trainedmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/trained_svmodelsALLwC_0/'
 tuningmod_savepath = '/media/fl18/Elements/Hypertuning/'
 
 ## Plot setup
@@ -65,7 +65,7 @@ fine_labels = {
     # svcases #
     'Bi0001': r'$Bi=0.001$', 'Bi0002': r'$Bi=0.002$', 'Bi0004': r'$Bi=0.004$', 'Bi001': r'$Bi=0.01$', 'Bi1': r'$Bi=1$',
     'B05': r'$Bi=0.1, \beta=0.5$','B07': r'$Bi=0.1, \beta=0.7$', 'B09': r'$Bi=0.1, \beta=0.9$',
-    'clean': r'Clean',
+    'clean_5hz': r'Cl: 5 Hz','clean_6hz': r'Cl: 6 Hz','clean_7hz': r'Cl: 7 Hz','clean_8hz': r'Cl: 8 Hz','clean_9hz': r'Cl: 9 Hz','clean_10hz': r'Cl: 10 Hz',
     # smx cases #
     'b03': r'$\beta=0.3$','b06':r'$\beta=0.6$','bi001':r'$Bi=0.01$','bi01':r'$Bi=0.1$','da01': r'$Da=0.1$','da1':r'$Da=1$',
     'b06pm':r'$\beta_{pm}=0.6$,','b09pm':r'$\beta_{pm}=0.9$,','bi001pm':r'$Bi_{pm}=0.01$,',
@@ -417,7 +417,7 @@ def input_data(svcases, features,smoothing_method):
 
     ## saving input data 
 
-    with open(os.path.join(input_savepath,'svinputdata.pkl'),'wb') as file:
+    with open(os.path.join(input_savepath,'svinputdataALLwC_0.pkl'),'wb') as file:
         pickle.dump(smoothed_data,file)
 
 ##################################### WINDOWING FUN. #################################################
@@ -434,7 +434,7 @@ def windowing(steps_in,steps_out,stride,train_frac,test_frac,svcases, features):
     ])
 
     # Reading saved re-shaped input data from file
-    with open(os.path.join(input_savepath,'svinputdataDSD_0.pkl'), 'rb') as file:
+    with open(os.path.join(input_savepath,'svinputdataALLwC_0.pkl'), 'rb') as file:
         input_df = pickle.load(file)
 
     train_arr, val_arr, test_arr, splitset_labels = windowing.split_cases(
@@ -468,7 +468,7 @@ def windowing(steps_in,steps_out,stride,train_frac,test_frac,svcases, features):
 
 ####################################### SAVING FUN. ##################################################
 
-def saving_data(wd,hp,model_choice,save_hp=True):
+def saving_data(wd,model_choice,hp=None,save_hp=False):
     
     set_labels = ["train", "val", "test"]
     arrays = [wd.train_arr, wd.val_arr, wd.test_arr]
@@ -873,9 +873,9 @@ def main():
     # 'bi1','bi01pm','3drop',
     # 'b09','da01pm','da001', 'coarsepm']
 
-    svcases = ['Bi0001','Bi0004','Bi001','B05','B07','clean','B09','Bi1','Bi0002']
+    svcases = ['Bi0001','Bi0004','Bi001','B05','B07','clean_5hz','clean_6hz','clean_7hz','clean_9hz','clean_10hz','B09','Bi1','Bi0002','clean_8hz']
 
-    features = ['Estimated Density of drop counts in one bin']#['Number of drops', 'Interfacial Area']
+    features = ['Number of drops', 'Interfacial Area']#['Estimated Density of drop counts in one bin']#
 
     smoothing_method = 'lowess'
 
@@ -921,8 +921,8 @@ def main():
     # trainloader = data.DataLoader(data.TensorDataset(X_train, y_train), shuffle=True, batch_size=batch_size)
     # valloader = data.DataLoader(data.TensorDataset(X_val, y_val), shuffle=True, batch_size=batch_size)
         
-    # ## Calling model class instance and training function
-    # model_choice = input('Select a LSTM model to train (DMS, S2S): ')
+    ## Calling model class instance and training function
+    model_choice = input('Select a LSTM model to train (DMS, S2S): ')
 
     # if model_choice == 'DMS':
     #     # LSTM model instance
@@ -958,7 +958,7 @@ def main():
     # else:
     #     raise ValueError('Model selected is not configured/does not exist. Double check input.')
 
-    # ######## SAVING ALL RELEVANT DATA ########
+    ######## SAVING ALL RELEVANT DATA ########
 
     # ## namedtuple used to store all hyperparams and send as a single arg to save_func
     # HyperParams = namedtuple('HyperParams', [
@@ -972,7 +972,7 @@ def main():
     # check_epochs=check_epochs, steps_in=steps_in, steps_out=steps_out, tf_ratio=tf_ratio, dynamic_tf=dynamic_tf
     # )
 
-    # saving_data(windowed_data,hyper_params,model_choice)
+    saving_data(windowed_data,model_choice)#,hyper_params,model_choice)
 
 if __name__ == "__main__":
     main()

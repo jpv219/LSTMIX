@@ -36,8 +36,8 @@ import ray.cloudpickle as raypickle
 
 fig_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/figs/'
 input_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/input_data/'
-trainedmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/trained_svmodels/'
-tuningmod_savepath = '/media/fl18/Elements/Hypertuning/'
+trainedmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/trained_svmodelsALLwC_0/'
+tuningmod_savepath = '/media/fl18/7fdd513c-7661-4b00-9133-33feed844edf/SMX/Hyptertuning/'
 
 ########################################### METHODS ###########################################
 
@@ -212,7 +212,7 @@ def main():
     X_tens, y_tens, _, _ ,_, _ = load_data(model_choice)
 
     # limit the number of CPU cores used for the whole tuning process
-    percent_cpu_to_occupy = 0.3
+    percent_cpu_to_occupy = 0.6
     total_cpus = psutil.cpu_count(logical=False)
     num_cpus_to_allocate = int(total_cpus * percent_cpu_to_occupy)
 
@@ -221,14 +221,14 @@ def main():
         'DMS': {
             'hidden_size': tune.choice([2 ** i for i in range(6, 9)]),
             'learning_rate': tune.choice([0.005,0.01]),
-            'batch_size': tune.choice(range(10, 40, 5)),
+            'batch_size': tune.choice(range(8, 44, 4)),
             'training_prediction': tune.choice(['none']),
             'tf_ratio': tune.choice([0]),
             'dynamic_tf': tune.choice(['False']),
-            'l1_lambda': tune.choice([0, 0.00001, 0.0001]),
-            'l2_lambda': tune.choice([0, 0.00001, 0.0001]),
+            'l1_lambda': tune.choice([0, 0.00001]),
+            'l2_lambda': tune.choice([0, 0.00001]),
             'batch_loss': tune.choice(['False']),
-            'penalty_weight': tune.choice([0.1,1,10])
+            'penalty_weight': tune.choice([0.01,0.1,1,10])
         },
         'S2S': {
             'hidden_size': tune.choice([2 ** i for i in range(6, 9)]),
@@ -240,7 +240,7 @@ def main():
             'l1_lambda': tune.choice([0]),
             'l2_lambda': tune.choice([0]),
             'batch_loss': tune.choice(['False']),
-            'penalty_weight': tune.choice([0.1,1, 10])
+            'penalty_weight': tune.choice([0.01,0.1,1,10])
         }
     }
 
@@ -251,8 +251,8 @@ def main():
         "input_size": X_tens[0].shape[-1],
         "output_size": y_tens[0].shape[-1],
         "pred_steps": 50,
-        "num_epochs": 100,
-        "check_epochs": 20
+        "num_epochs": 120,
+        "check_epochs": 30
     }
 
     # Configure and run RAY TUNING 
@@ -261,13 +261,12 @@ def main():
     mode='min',
     max_t= init["num_epochs"],
     grace_period=40, # save period without early stopping
-    grace_period=40, # save period without early stopping
     reduction_factor=2,
     )
 
     ray.shutdown()
     ray.init(num_cpus=num_cpus_to_allocate)
-    num_samples = 400
+    num_samples = 1500
     log_file_path = os.path.join(tuningmod_savepath,model_choice,f'logs/{model_choice}_tune_out.log')
 
     # Run the experiment
@@ -295,7 +294,7 @@ def main():
 
     print('Model state and config settings copied to best_model folder')
 
-    #### FURTHER TRAINING WITH TUNED MODEL ###
+    ### FURTHER TRAINING WITH TUNED MODEL ###
 
     train_further = input('Train best tuned trial further? (y/n): ')
 
@@ -306,44 +305,10 @@ def main():
             "input_size": X_tens[0].shape[-1],
             "output_size": y_tens[0].shape[-1],
             "pred_steps": 50,
-            "num_epochs": 2000,
+            "num_epochs": 3000,
             "check_epochs": 100,
             "steps_in": 50,
             "steps_out": 50
-    }
-        
-        further_train(model_choice,init_training,X_tens,y_tens,best_trial,best_chkpoint)
-
-    print(f'Finished tuning hyperparameters with {num_samples} samples')
-    print(f'Best trial id: {best_trial.trial_id}')
-    print(f'Best trial config: {best_trial.config}')
-
-    # Saving best model and config to external path
-    best_model_path = os.path.join(tuningmod_savepath,f'best_models/{model_choice}')
-
-    shutil.copy(f'{best_chkpoint.path}/chk_dict.pkl',best_model_path)
-
-    with open(f'{best_model_path}/config_{model_choice}.pkl', 'wb') as pickle_file:
-
-        pickle.dump(best_trial.config, pickle_file)
-
-    print('Model state and config settings copied to best_model folder')
-
-    #### FURTHER TRAINING WITH TUNED MODEL ###
-
-    train_further = input('Train best tuned trial further? (y/n): ')
-
-    if train_further.lower() == 'y':
-    
-        ## Setting new init and config parameters for further training of best trial tuned
-        init_training = {
-            "input_size": X_tens[0].shape[-1],
-            "output_size": y_tens[0].shape[-1],
-            "pred_steps": 30,
-            "num_epochs": 3000,
-            "check_epochs": 100,
-            "steps_in": 40,
-            "steps_out": 30
     }
         
         further_train(model_choice,init_training,X_tens,y_tens,best_trial,best_chkpoint)

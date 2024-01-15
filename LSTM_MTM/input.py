@@ -8,6 +8,7 @@
 import numpy as np
 import pandas as pd
 import Load_Clean_DF
+import inputDSD as dsd
 from sklearn.preprocessing import MinMaxScaler
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -76,32 +77,35 @@ def import_rawdata(case):
 
     return df_Vol, Nd, IntA
 
-def import_svrawdata(case, initial=320, stop=704, opt=0.00625):
+def import_svrawdata(case, opt, initial=320, stop=704):
     '''
     return a dataframe with columns ['Time', 'DropVolume', 'Gammatilde', 'DropNum', 'IntArea']
     '''
     
     data_dir = '/home/fl18/Desktop/automatework/RNN_auto/APSdata/'
     df = pd.read_csv(str(data_dir)+str(case)+'.csv')
-    
+    print(f'------------{case}---------')
     # surfactant-laden cases to count the drop numbers from list drop volume
-    if not case == 'clean':
+    if 'clean' in case:
+        df['DropVolume'] = df['DropVolume'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
+        df['DropNum'] = df['DropVolume'].apply(lambda x: len(x))
+    
+    else:
         df['DropVolume'] = df['DropVolume'].str.replace(' ',', ')
         df['Gammatilde'] = df['Gammatilde'].apply(lambda x: ', '.join(x.split())) # standardize the separator
         df['DropVolume'] = df['DropVolume'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
         df['Gammatilde'] = df['Gammatilde'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
         df['DropNum'] = df['DropVolume'].apply(lambda x: len(x))
     
-    else:
-        df['DropVolume'] = df['DropVolume'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
-        df['DropNum'] = df['DropVolume'].apply(lambda x: len(x))
-    
     # Truncation of data
-    truned_df = df.loc[(df['Time']/opt >= initial) & (df['Time']/opt <= stop)]
+    truned_df = df.loc[(round(df['Time']/opt) >= initial) & (round(df['Time']/opt) <= stop)]
+    print(f'opt:{opt}')
+    print(truned_df['Time'].min(), truned_df['Time'].max())
     
     # merge the data of interfacial area
     ints_df = pd.read_csv(str(data_dir)+'IntArea_'+str(case)+'.csv')
     data = pd.merge(truned_df, ints_df, on='Time', how='left')
+    print(len(data), pd.isna(data).any())
     
     return data
 
@@ -122,14 +126,19 @@ def sort_inputdata(cases):
         # n_drops = Nd['Ndrops']
         # IA = IntA['IA']
         # DSD = df_Vol['Volume']
-        data = import_svrawdata(case)
+        if 'clean' in case:
+            f = int(case.split('_')[1][:-2])
+            data = import_svrawdata(case, opt=1/32/f)
+        else:
+            data = import_svrawdata(case, opt=0.00625)
+        
         time = data['Time']
         n_drops = data['DropNum']
         IA = data['IntArea']
         DSD = data['DropVolume']
-        
+
         # Determine if case needs surf. conc. or clean
-        if case == '3drop' or case == 'coarsepm' or case == 'clean':
+        if case == '3drop' or case == 'coarsepm' or 'clean' in case:
             G = []  # If true, set G as an empty list
         else:
             G = data['Gammatilde']  # If false, extract G data
@@ -318,7 +327,7 @@ def main():
     # 'bi1','bi01pm','3drop',
     # 'b09','da01pm','da001', 'coarsepm']
 
-    svcases = ['Bi0001','Bi0002','Bi001','B07','clean','Bi1','Bi0004','B09','B05']
+    svcases = ['Bi0001','Bi0004','Bi001','B05','B07','clean_5hz','clean_6hz','clean_7hz','clean_9hz','clean_10hz','B09','Bi1','Bi0002','clean_8hz']
 
     # List of columns to be normalized
     norm_columns = ['Number of drops', 'Interfacial Area']
@@ -339,7 +348,7 @@ def main():
 
     ## saving input data 
 
-    with open(os.path.join(input_savepath,'svinputdata.pkl'),'wb') as file:
+    with open(os.path.join(input_savepath,'svinputdatawC.pkl'),'wb') as file:
         pickle.dump(smoothed_data,file)
 
 if __name__ == "__main__":

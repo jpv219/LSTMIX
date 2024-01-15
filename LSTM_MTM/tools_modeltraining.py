@@ -18,6 +18,7 @@ import torch.nn as nn
 #trainedmod_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/trained_models/'
 
 trainedmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/trained_svmodels/'
+# trainedmod_savepath = '/content/fuyue_data/trained_svmodels/'
 
 ##################################### CLASSES #################################################
 
@@ -30,7 +31,7 @@ class custom_loss(nn.Module):
         
     def forward(self, prediction, target):
         # mse as base loss function
-        mse_loss = nn.MSELoss()(prediction, target)
+        mse_loss = nn.MSELoss()(prediction, target)#.to('cuda')
         
         # penalise negative prediction
         '''

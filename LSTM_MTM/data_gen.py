@@ -11,8 +11,8 @@ import os
 import pickle
 
 ## env. variables 
-trainedmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/trained_models/'
-input_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/input_data/'
+trainedmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/trained_svmodels/'
+input_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/input_data/'
 
 
 ########################################### MAIN ###########################################
@@ -22,11 +22,11 @@ def main():
     ####### WINDOW DATA ########
 
     ## Windowing hyperparameters
-    steps_in, steps_out = 40, 30
+    steps_in, steps_out = 50, 50
     stride = 1
 
     ## Smoothing parameters
-    smoothing_method = 'savgol'
+    smoothing_method = 'lowess'
     window_size = 5 # needed for moveavg and savgol
     poly_order = 3 # needed for savgol
     lowess_frac = 0.03 #needed for lowess
@@ -39,19 +39,21 @@ def main():
     if choice.lower() == 'y':
 
         ## Cases to split and features to read from 
-        Allcases = ['bi001', 'bi01', 'b09', 'b06pm', 'b03', 'da01pm', 'da01', 'bi01pm', '3drop',
-        'coarsepm', 'bi001pm', 'bi1',
-        'b06', 'b09pm', 'da1', 'da001']
+        # Allcases = ['bi001', 'bi01', 'b09', 'b06pm', 'b03', 'da01pm', 'da01', 'bi01pm', '3drop',
+        # 'coarsepm', 'bi001pm', 'bi1',
+        # 'b06', 'b09pm', 'da1', 'da001']
+
+        svcases = ['Bi0001','Bi0004','Bi001','B05','B07','clean','B09','Bi1','Bi0002']
 
         # Random sampling
-        cases = random.sample(Allcases,len(Allcases))
+        cases = random.sample(svcases,len(svcases))
 
         features = ['Number of drops', 'Interfacial Area']
 
-        trn.input_data(Allcases,features,smoothing_method,smoothing_params)
+        trn.input_data(svcases,features,smoothing_method,smoothing_params)
 
     # Reading saved re-shaped input data from file
-    with open(os.path.join(input_savepath,'inputdata.pkl'), 'rb') as file:
+    with open(os.path.join(input_savepath,'svinputdata.pkl'), 'rb') as file:
         input_pkg = pickle.load(file)
 
     # Reading input data sets and labels previously processed and stored
@@ -60,8 +62,8 @@ def main():
     features = input_pkg['features']
     
     ## data splitting for training, validating and testing
-    train_frac = 9/16
-    test_frac = 4/16
+    train_frac = 0.7
+    test_frac = 0.15
 
     windowed_data = trn.windowing(steps_in,steps_out,stride,train_frac, test_frac, input_df, Allcases,features)
 

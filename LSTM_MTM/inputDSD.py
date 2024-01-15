@@ -61,7 +61,7 @@ def find_rng(data_dir, cases):
     
     for case in cases:
         data = pd.read_csv(str(data_dir)+str(case)+'.csv')
-        if not case == 'clean':
+        if not 'clean' in case:
             data = clean_csv(data,['DropVolume','Gammatilde'])
         else:
             data['DropVolume'] = data['DropVolume'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
@@ -107,7 +107,7 @@ def count_drops(data_dir,cases,bin_num,mybins):
     
     for case in cases:
         data = pd.read_csv(str(data_dir)+str(case)+'.csv')
-        if not case == 'clean':
+        if not 'clean' in case:
             data = clean_csv(data,['DropVolume','Gammatilde'])
         else:
             data['DropVolume'] = data['DropVolume'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
@@ -169,7 +169,7 @@ def density_func_est(bin_edges, binned_data,leftmost, rightmost, cases):
 def main():
 
     data_dir = '/home/fl18/Desktop/automatework/RNN_auto/APSdata/'
-    svcases = ['Bi0001','Bi0004','Bi001','B05','B07','clean','B09','Bi1','Bi0002']
+    svcases = ['Bi0001','Bi0004','Bi001','B05','B07','clean_5hz','clean_6hz','clean_7hz','clean_9hz','clean_10hz','B09','Bi1','Bi0002','clean_8hz']
     bin_num = 20
 
     rng_floor, rng_ceil = find_rng(data_dir, svcases)
@@ -180,7 +180,7 @@ def main():
     rightmost=15
 
     bin_edges_to_saved = bin_edges[leftmost:rightmost]
-    with open(os.path.join(input_savepath,'svinputdataBins.pkl'),'wb') as file:
+    with open(os.path.join(input_savepath,'svinputdataBinswC.pkl'),'wb') as file:
         pickle.dump(bin_edges_to_saved,file)
 
     transdata = density_func_est(bin_edges, drops_in_bins, leftmost, rightmost,svcases)
@@ -191,17 +191,22 @@ def main():
     smoothed_data = ipt.smoothing(DSD_data,'lowess',lowess_frac=0.06)
 
     # save the data
-    with open(os.path.join(input_savepath,'svinputdataDSD.pkl'),'wb') as file:
+    with open(os.path.join(input_savepath,'svinputdataDSDwC.pkl'),'wb') as file:
         pickle.dump(smoothed_data,file)
+    with open(os.path.join(input_savepath,'svinputdataDSDwC_0.pkl'),'wb') as file:
+        pickle.dump(DSD_data,file)
 
     # reading the saved Nd and IA
-    with open(os.path.join(input_savepath,'svinputdata.pkl'), 'rb') as file:
+    with open(os.path.join(input_savepath,'svinputdatawC.pkl'), 'rb') as file:
         Nd_IA_data = pickle.load(file)
     
-    alldata = np.concatenate((Nd_IA_data, DSD_data), axis=-1)
+    alldata_0 = np.concatenate((Nd_IA_data, DSD_data), axis=-1)
+    alldata = np.concatenate((Nd_IA_data, smoothed_data), axis=-1)
 
     # save the all Nd IA and DSD
-    with open(os.path.join(input_savepath,'svinputdataALL.pkl'),'wb') as file:
+    with open(os.path.join(input_savepath,'svinputdataALLwC_0.pkl'),'wb') as file:
+        pickle.dump(alldata_0,file)
+    with open(os.path.join(input_savepath,'svinputdataALLwC.pkl'),'wb') as file:
         pickle.dump(alldata,file)
 
 
