@@ -18,7 +18,6 @@ from sklearn.metrics import r2_score
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from matplotlib.ticker import FormatStrFormatter
 from scipy.stats import wasserstein_distance
-from scipy.special import kl_div,rel_entr
 from matplotlib.colors import ListedColormap
 import shap
 
@@ -31,7 +30,7 @@ import shap
 #trainedmod_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/trained_models/'
 
 fig_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/figs/'
-trainedmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/trained_svmodelsALLwC_0/Juan_Newmodels_1/'
+trainedmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/trained_svmodelsALLwC_0/'#Juan_Newmodels_1/'
 # trainedmod_savepath = '/home/fl18/Downloads/Juan_Newmodels/'
 input_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/input_data/'
 
@@ -107,6 +106,7 @@ def rollout(model, input_seq, steps_out,total_steps):
 
 ####################################### PLOTTING FUN. #####################################
 
+# Plot training and validation results from LSTM's training stage (windowed data in batches)
 def plot_model_pred(model,fine_labels, model_name,features,set_labels,set,
                     X_data,true_data,wind_size,casebatch_len):
 
@@ -386,7 +386,7 @@ def plot_all_model_pred(model,fine_labels, model_name,features,set_labels,set,
         fig.supylabel('PD per DSD bin',fontsize=30)
         fig.suptitle(f'Prediction with LSTM {model_name} for DSD {set} set',fontsize=40)
         # fig.savefig(os.path.join(fig_savepath, f'AICHE_{set}.png'), dpi=150)
-        fig.savefig(os.path.join(fig_savepath, f'Predall_{model_name}_DSD_{set}_set.png'), dpi=150)
+        # fig.savefig(os.path.join(fig_savepath, f'Predall_{model_name}_DSD_{set}_set.png'), dpi=150)
         plt.show()
 
 def plot_all_rollout_pred(rollout_seq, true_data, input_steps, features,set_labels, model_name):
@@ -492,18 +492,15 @@ def plot_all_rollout_pred(rollout_seq, true_data, input_steps, features,set_labe
         fig.supylabel(r'$\hat{n}$', fontsize=40,fontweight='bold')
         # fig.suptitle(f'Rollout pred with LSTM {model_name} for DSD bins', fontsize=40)
         fig.subplots_adjust(wspace=0.2)
-        fig.savefig(os.path.join(fig_savepath, f'Rollout_Static_{model_name}_DSD.png'))
+        # fig.savefig(os.path.join(fig_savepath, f'Rollout_Static_{model_name}_DSD.png'))
         plt.show()
 
 
 def plot_rollout_dist(rollout_seq, true_data, input_steps, set_labels, bin_edges, model_name):
     cmap = sns.color_palette('RdBu', len(set_labels)*4)
     colors = cmap[::4][:len(set_labels)]
+    
     # comparion of temporal distributions
-    fig1, axes1 = plt.subplots(2,1,figsize=(6,12))
-    fig1.tight_layout(rect=[0,0,1,0.95])
-    fig1.subplots_adjust(hspace=0.3)
-
     for t in range(input_steps,true_data.shape[0]):#(input_steps, true_data.shape[0]):
         t_label = t#(t+320)/32
         
@@ -526,66 +523,26 @@ def plot_rollout_dist(rollout_seq, true_data, input_steps, set_labels, bin_edges
             axes[seq].set_title(f'{plot_label}')
             axes[seq].legend(loc='upper left')
         
-        fig.suptitle(f'Prediction with {model_name} for Drop size Distribution at time {t_label:.4f} [Rev.]', fontweight='bold')
+        # fig.suptitle(f'Prediction with {model_name} for Drop size Distribution at time {t_label:.4f} [Rev.]', fontweight='bold')
         fig.supxlabel(r'log$_{10} (V_d/V_{cap})$',fontweight='bold')
         fig.supylabel(f'Drop count density',fontweight='bold')
-        fig.savefig(os.path.join(fig_savepath, 'temporal_dist',f'Rollout_{model_name}_DSD_{t+320}.png'), dpi=150)
+        # fig.savefig(os.path.join(fig_savepath, 'temporal_dist',f'Rollout_{model_name}_DSD_{t+320}.png'), dpi=150)
     #     # plt.show()
 
-    #     for seq,case in enumerate(set_labels):
-    #         plot_label = fine_labels.get(case,case)
-            
-    #         ## Wasserstain
-    #         try:
-    #             emd = wasserstein_distance(bin_edges, bin_edges, true_data[t,seq,2:], rollout_seq[seq,t,2:])
-    #         except:
-    #             emd=0
-            
-    #         axes1[0].scatter(t, emd,color = colors[seq % len(colors)],label=f'{plot_label}')
-    #         # axes1[0].set_xlim([50,400])
-    #         axes1[0].set_xlim([40,100])
-    #         axes1[0].set_ylim([0,1])
-    #         axes1[0].set_title('Wasserstein value',fontweight='bold')
-    #         axes1[0].set_xlabel(r'Time steps',fontweight='bold')
-    #         # axes1[0].legend(title='Encoder-decoder: Static mixer', title_fontsize=18,
-    #         #                 loc='upper left',fontsize=16,
-    #         #                 edgecolor='black', frameon=True)
-            
-    #         ## Wasserstain 
-    #         kl_PQ = kl_div(np.array(true_data[t,seq,2:]),np.array(rollout_seq[seq,t,2:])).sum()
-    #         axes1[1].scatter(t, kl_PQ ,color = colors[seq % len(colors)],label=f'{plot_label}')
-    #         # axes1[1].set_xlim([50,400])
-    #         axes1[1].set_xlim([40,100])
-    #         axes1[1].set_ylim([0,1])
-    #         axes1[1].set_title('K-L divergence',fontweight='bold')
-    #         axes1[1].set_xlabel(r'Time steps',fontweight='bold')
-
-    #         # plt.setp(axes1[seq].spines.values(),linewidth = 1.5)
-    #         for axis in ['top', 'bottom', 'left', 'right']:
-    #             axes1[0].spines[axis].set_linewidth(1.5)  # change width
-    #             axes1[1].spines[axis].set_linewidth(1.5)
-            
-    #     # fig1.suptitle(f'Comparison between Target and Prediction from {model_name}',fontweight='bold')
-    #     fig1.savefig(os.path.join(fig_savepath,f'EMD_{model_name}_DSD_{t_label}.png'), dpi=150)
-    # # plt.show()
-
-def plot_EMDkldiv(rollout_seq, true_data, input_steps, set_labels, bin_edges, model_name):
+def plot_EMD(rollout_seq, true_data, input_steps, set_labels, bin_edges, model_name):
     cmap = sns.color_palette('RdBu', len(set_labels)*4)
     colors = cmap[::4][:len(set_labels)]
-    # comparion of temporal distributions
-    # fig1, axes1 = plt.subplots(2,1,figsize=(6,12))
-    fig1, axes1 = plt.subplots(figsize=(10,8))
-    fig1.tight_layout(rect=[0,0,1,0.95])
-    fig1.subplots_adjust(hspace=0.3)
 
-        
+    fig, axes = plt.subplots(figsize=(10,8))
+    fig.tight_layout(rect=[0,0,1,0.95])
+    fig.subplots_adjust(hspace=0.3)
+
     for seq,case in enumerate(set_labels):
         plot_label = fine_labels.get(case,case)
 
         emds=[]
-        kl_PQs=[]
-        r_es = []
-        for t in range(input_steps,true_data.shape[0]):#(input_steps, true_data.shape[0]):
+        
+        for t in range(input_steps,true_data.shape[0]):
             t_label = t#(t+320)/32
             
             ## Wasserstain
@@ -593,42 +550,26 @@ def plot_EMDkldiv(rollout_seq, true_data, input_steps, set_labels, bin_edges, mo
                 emd = wasserstein_distance(bin_edges, bin_edges, true_data[t,seq,2:], rollout_seq[seq,t,2:])
             except:
                 emd=-0.1
-            ## K-L div
-            kl_PQ = kl_div(np.array(rollout_seq[seq,t,2:]),np.array(true_data[t,seq,2:])).sum()
-            r_e = sum(rel_entr(np.array(rollout_seq[seq,t,2:]),np.array(true_data[t,seq,2:])))
 
             emds.append(emd)
-            kl_PQs.append(kl_PQ)
-            r_es.append(r_e)
-        r_es = np.nan_to_num(r_es,copy=False,posinf=1)
-        # print(r_es)
-        axes1.scatter(range(input_steps, true_data.shape[0]), emds,color = colors[seq % len(colors)],label=f'{plot_label}')
-        # axes1.set_xlim([50,400])
-        axes1.set_xlim([40,100])
-        axes1.set_ylim([0,1])
-        axes1.set_ylabel('Wasserstein distance',fontweight='bold',fontsize=30)
-        axes1.set_xlabel(r'Time steps',fontweight='bold',fontsize=30)
-        axes1.tick_params(axis='both',labelsize=20)
-        axes1.legend(title='Encoder-decoder: Static mixer', title_fontsize=20,
+
+        axes.scatter(range(input_steps, true_data.shape[0]), emds,color = colors[seq % len(colors)],label=f'{plot_label}')
+        # axes.set_xlim([50,400])
+        axes.set_xlim([40,100])
+        axes.set_ylim([0,1])
+        axes.set_ylabel('Wasserstein distance',fontweight='bold',fontsize=30)
+        axes.set_xlabel(r'Time steps',fontweight='bold',fontsize=30)
+        axes.tick_params(axis='both',labelsize=20)
+        axes.legend(title='Encoder-decoder: Static mixer', title_fontsize=20,
                         loc='upper right',fontsize=16,
                         edgecolor='black', frameon=True) 
-        
-        # axes1[1].scatter(range(input_steps, true_data.shape[0]), r_es,color = colors[seq % len(colors)],label=f'{plot_label}')
-        # # axes1[1].set_xlim([50,400])
-        # axes1[1].set_xlim([40,100])
-        # axes1[1].set_ylim([0,1])
-        # axes1[1].set_ylabel('K-L divergence',fontweight='bold',fontsize=30)
-        # axes1[1].set_xlabel(r'Time steps',fontweight='bold',fontsize=30)
-        # axes1[1].tick_params(axis='both',labelsize=20)
 
-        # plt.setp(axes1[seq].spines.values(),linewidth = 1.5)
         for axis in ['top', 'bottom', 'left', 'right']:
-            axes1.spines[axis].set_linewidth(1.5)  # change width
-            # axes1[1].spines[axis].set_linewidth(1.5)
+            axes.spines[axis].set_linewidth(1.5)  # change width
                 
     # fig1.suptitle(f'Comparison between Target and Prediction from {model_name}',fontweight='bold')
-    fig1.tight_layout()
-    fig1.savefig(os.path.join(fig_savepath,f'EMD_{model_name}_DSD_{t_label}_0.png'), dpi=150)
+    fig.tight_layout()
+    # fig.savefig(os.path.join(fig_savepath,f'EMD_{model_name}_DSD_{t_label}_0.png'), dpi=150)
         # plt.show()
 
 
@@ -708,18 +649,13 @@ def main():
         features = ['ND', 'IA']
         if X_train.shape[-1] == 2:
             features = features
-            # using windowed tensors for plots to represent final training and validation state
-            plot_all_model_pred(model, fine_labels,model_choice, features, splitset_labels[0],
-                            'Train',X_train, train_arr, wind_size, train_casebatch)
-            plot_all_model_pred(model,fine_labels, model_choice, features, splitset_labels[1],
-                'Validation',X_val, val_arr, wind_size, val_casebatch)
         elif X_train.shape[-1] > 2:
             for i in range(2, X_train.shape[-1]):
                 features.append(f'Range {i-1}')
-            plot_all_model_pred(model, fine_labels,model_choice, features, splitset_labels[0],
-                            'Train',X_train, train_arr, wind_size, train_casebatch)
-            plot_all_model_pred(model,fine_labels, model_choice, features, splitset_labels[1],
-                'Validation',X_val, val_arr, wind_size, val_casebatch)
+        plot_all_model_pred(model, fine_labels,model_choice, features, splitset_labels[0],
+                        'Train',X_train, train_arr, wind_size, train_casebatch)
+        plot_all_model_pred(model,fine_labels, model_choice, features, splitset_labels[1],
+            'Validation',X_val, val_arr, wind_size, val_casebatch)
             
     else:
         pass
@@ -747,28 +683,13 @@ def main():
     features = ['ND', 'IA']
     if test_arr.shape[-1] == 2:
         features = features
-        plot_all_rollout_pred(rollout_seq,test_arr, hyperparams['steps_in'], features,splitset_labels[2], model_choice)
     elif test_arr.shape[-1] > 2:
         for i in range(2, test_arr.shape[-1]):
                 features.append(f'Range {i-1}')
-        # plot_rollout_dist(rollout_seq,test_arr, hyperparams['steps_in'], splitset_labels[2], bin_edges, model_choice)
-        plot_all_rollout_pred(rollout_seq,test_arr, hyperparams['steps_in'], features,splitset_labels[2], model_choice)
-        # plot_EMDkldiv(rollout_seq,test_arr, hyperparams['steps_in'], splitset_labels[2], bin_edges, model_choice)
 
-        
-        ## SHAP plots
-        # reshaped_input = np.transpose(input_seq, (1,0,2)) #reshaping to case,inputdata,features
-        
-        # tensor_input = torch.Tensor(reshaped_input)
-
-        # X_test = tensor_input.detach().clone()
-
-        # with open(os.path.join(input_savepath, 'svinputdataALLwC_0.pkl'), 'rb') as file:
-        #     base_data = pickle.load(file)
-        # explainer = shap.DeepExplainer(model,X_train)#torch.from_numpy(base_data[:,10:13,:]).to(torch.float32)
-        # shap_values = explainer.shap_values(X_test)
-        # shap.initjs()
-        # shap.summary_plot(shap_values, X_test)
+    # plot_rollout_dist(rollout_seq,test_arr, hyperparams['steps_in'], splitset_labels[2], bin_edges, model_choice)
+    plot_all_rollout_pred(rollout_seq,test_arr, hyperparams['steps_in'], features,splitset_labels[2], model_choice)
+    # plot_EMD(rollout_seq,test_arr, hyperparams['steps_in'], splitset_labels[2], bin_edges, model_choice)
 
 
 if __name__ == "__main__":
