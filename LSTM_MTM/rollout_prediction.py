@@ -364,30 +364,29 @@ def plot_rollout_dist(rollout_seq, true_data, input_steps, set_labels, bin_edges
 
     # comparison of temporal distributions
     for t in range(input_steps, true_data.shape[0]):
-        t_label = t
         
         # temporal distribution
-        fig,axes = plt.subplots(1,3, figsize=(12, 6))
+        fig,ax = plt.subplots(4,2, figsize=(12, 12))
         fig.tight_layout(rect=[0.05,0.02,1,0.9])
         for seq, case in enumerate(set_labels):
             # # if more than one columns are plotting
-            # row = seq // 2
-            # col = seq % 2
-            # axes = axes[row, col]
+            row = seq // 2
+            col = seq % 2
+            axes = ax[row, col]
             
             # Target plots, true data from CFD
             plot_label = fine_labels.get(case,case)
 
-            axes[seq].hist(bin_edges, bins=len(bin_edges), weights=true_data[t,seq,2:], color='gray', alpha=0.5, label=f'Target')
-            axes[seq].hist(bin_edges, bins=len(bin_edges), weights=rollout_seq[seq,t,2:],color = colors[seq % len(colors)],
+            axes.hist(bin_edges, bins=len(bin_edges), weights=true_data[t,seq,2:], color='gray', alpha=0.5, label=f'Target')
+            axes.hist(bin_edges, bins=len(bin_edges), weights=rollout_seq[seq,t,2:],color = colors[seq % len(colors)],
                            lw=2, fill=None, histtype='step', label=f'Pred')
             
-            plt.setp(axes[seq].spines.values(),linewidth = 1.5)
+            plt.setp(axes.spines.values(),linewidth = 1.5)
             for axis in ['top', 'bottom', 'left', 'right']:
-                axes[seq].spines[axis].set_linewidth(1.5)  # change width
+                axes.spines[axis].set_linewidth(1.5)  # change width
 
-            axes[seq].set_title(f'{plot_label}')
-            axes[seq].legend(loc='upper left')
+            axes.set_title(f'{plot_label}')
+            axes.legend(loc='upper left')
         
         # fig.suptitle(f'Prediction with {model_name} for Drop Size Distribution at timestep {t_label:.4f}', fontweight='bold')
         fig.supxlabel(r'log$_{10} (V_d/V_{cap})$',fontweight='bold')
@@ -438,7 +437,7 @@ def plot_EMD(rollout_seq, true_data, input_steps, set_labels, bin_edges, model_n
                 
     # fig1.suptitle(f'Comparison between Target and Prediction from {model_name}',fontweight='bold')
     fig.tight_layout()
-    fig.savefig(os.path.join(fig_savepath,f'EMD_{model_name}_DSD_{t_label}_0.png'), dpi=150)
+    fig.savefig(os.path.join(fig_savepath, 'temporal_EMD',model_name,f'EMD_{model_name}_DSD_{t}.png'), dpi=150)
         # plt.show()
 
 # y_x error dispersion for training/validation
