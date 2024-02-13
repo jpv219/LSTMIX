@@ -22,6 +22,7 @@ from contextlib import redirect_stdout
 import time
 import tracemalloc
 from memory_profiler import profile
+from functools import wraps
 
 import ray
 from ray import tune
@@ -45,6 +46,21 @@ tuningmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/tuning/'
 #input_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX//LSTM_MTM/input_data/'
 #trainedmod_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/trained_models'
 #tuningmod_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/tuning/'
+
+##################################### DECORATORS #################################################
+
+# Custom memory profile decorator
+def mem_profile(model):
+
+    file_path = os.path.join(tuningmod_savepath, model,'logs', f"{model}_tuning_memlog.txt")
+
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+
+            return profile(precision=4,stream=open(file_path,'w'))(func)(*args, **kwargs)
+        return wrapper
+    return decorator
 
 ########################################### METHODS ###########################################
 
@@ -280,8 +296,11 @@ def main():
     num_samples = 1296
     log_file_path = os.path.join(tuningmod_savepath,model_choice,f'logs/{model_choice}_tune_out.log')
 
+    #Decorate the tuner
+    tune_dec = mem_profile(model=model_choice)(run_tuning)
+
     # Run the experiment
-    tuner = run_tuning(search_space, model_choice, init, X_tens, 
+    tuner = tune_dec(search_space, model_choice, init, X_tens, 
                        y_tens,scheduler, num_samples, log_file_path, best_chkpt_path='', tuning=True)
     
     # Extract results from tuning process
