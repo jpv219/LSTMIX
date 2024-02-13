@@ -823,6 +823,8 @@ def main():
 
     input_train = train_arr[:hyperparams['steps_in'],:,:]
     input_val = val_arr[:hyperparams['steps_in'],:,:]
+    
+    # Saving performance in a log
     logtrain_path = os.path.join(fig_savepath,'performance_logs',f'{model}_trainroll.txt')
 
     with open(logtrain_path,'w') as logfile:

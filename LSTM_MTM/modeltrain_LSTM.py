@@ -20,7 +20,7 @@ from collections import namedtuple
 import time
 import tracemalloc
 from memory_profiler import profile
-import functools
+from functools import wraps
 
 
 from tools_modeltraining import custom_loss, EarlyStopping
@@ -432,20 +432,17 @@ class LSTM_S2S(nn.Module):
 ##################################### DECORATORS #################################################
 
 # Custom memory profile decorator
-def decorator_factory(model):
+def mem_profile(model):
 
-    def memprofile_decorator(func): 
+    file_path = os.path.join(trainedmod_savepath, f'{model}_logs', f"{model}_training_memlog.txt")
 
-        file_path = os.path.join(trainedmod_savepath, f'{model}_logs', f"{model}_training_memlog.txt")
-
-        @profile(precision=4,stream=open(file_path,'w'))
-        @functools.wraps(func)
+    def decorator(func):
+        @wraps(func)
         def wrapper(*args, **kwargs):
-            return func(*args, **kwargs)
 
+            return profile(precision=4,stream=open(file_path,'w'))(func)(*args, **kwargs)
         return wrapper
-    
-    return memprofile_decorator
+    return decorator
 
 ##################################### INPUT_DATA FUN. ################################################
 
@@ -1074,7 +1071,6 @@ def main():
     model_choice = input('Select a LSTM model to train (DMS, S2S): ')
 
     # Creating a memory decorator from the factory
-    mem_profiler = decorator_factory(model_choice)
 
     if model_choice == 'DMS':
         # LSTM model instance
@@ -1087,8 +1083,9 @@ def main():
         scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=True)
         
         #Decorating the training function with the memory profiler
-        train_DMS_dec = mem_profiler(train_DMS)
         
+        train_DMS_dec = mem_profile(model=model_choice)(train_DMS)
+
         train_DMS_dec(model, optimizer, loss_fn, trainloader, valloader, scheduler, 
             num_epochs, check_epochs, X_train, y_train, X_val, 
             y_val,saveas='DMS_out',batch_loss=False)
@@ -1104,7 +1101,7 @@ def main():
         scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=True)
         
         #Decorating the training function with the memory profiler
-        train_S2S_dec = mem_profiler(train_S2S)
+        train_S2S_dec = mem_profile(model=model_choice)(train_S2S)
         
         train_S2S_dec(model,optimizer, loss_fn, trainloader, valloader, scheduler, num_epochs, 
                   check_epochs,pred_steps,X_train,y_train, X_val, y_val,
