@@ -20,13 +20,6 @@ import random
 import ast
 
 ## Env. variables ##
-
-# fig_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/figs/'
-# input_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/input_data/'
-
-#fig_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/figs/'
-#input_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX//LSTM_MTM/input_data/'
-
 fig_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/figs/'
 input_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/input_data/'
 
@@ -326,7 +319,7 @@ def main():
     # Allcases = ['b03','b06','bi001','bi01','da01','da1','b06pm','b09pm','bi001pm',
     # 'bi1','bi01pm','3drop',
     # 'b09','da01pm','da001', 'coarsepm']
-
+    
     svcases = ['Bi0001','Bi0004','Bi001','B05','B07','clean_5hz','clean_6hz','clean_7hz','clean_9hz','clean_10hz','B09','Bi1','Bi0002','clean_8hz']
 
     # List of columns to be normalized
