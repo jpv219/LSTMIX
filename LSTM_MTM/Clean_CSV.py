@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import warnings
+import ast
 warnings.filterwarnings('ignore')
 
 def clean_csv(df,columns):

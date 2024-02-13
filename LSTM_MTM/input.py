@@ -27,9 +27,9 @@ import copy
 #fig_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/figs/'
 #input_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX//LSTM_MTM/input_data/'
 
-fig_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/figs/'
-input_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/input_data/'
-raw_datapath = '/home/jpv219/Documents/ML/LSTM_SMX/RawData'
+fig_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/figs/'
+input_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/input_data/'
+raw_datapath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/RawData'
 
 ## Plot setup
 
@@ -524,9 +524,11 @@ def setup_DSD(n_bins,cases,feature_map,DSD_columns,pre_dict):
 
 def main():
 
-    Allcases = ['bi001', 'bi01', 'b09', 'b06pm', 'b03', 'da01pm', 'da01', 'bi01pm', '3d', 'alt1', 'alt4_b09','b03a','b09a','bi01a','bi1a',
-        'PM', 'bi001pm', 'bi1', 'alt3','alt1_b09','alt4_f','b06a',
-        'b06', 'b09pm', 'da1', 'da001','alt2','bi001a','FPM']
+    # Allcases = ['bi001', 'bi01', 'b09', 'b06pm', 'b03', 'da01pm', 'da01', 'bi01pm', '3d', 'alt1', 'alt4_b09','b03a','b09a','bi01a','bi1a',
+    #     'PM', 'bi001pm', 'bi1', 'alt3','alt1_b09','alt4_f','b06a',
+    #     'b06', 'b09pm', 'da1', 'da001','alt2','bi001a','FPM']
+    
+    Allcases = ['Bi0001','Bi0004','Bi001','B05','B07','5hz','6hz','7hz','9hz','10hz','B09','Bi1','Bi0002','8hz']
 
     # Randomizing cases for different train-test set splitting
     cases = random.sample(Allcases,len(Allcases))
@@ -599,7 +601,7 @@ def main():
     if DSD_choice.lower() == 'y':
         save_dict['bin_edges'] = bin_edges
 
-    with open(os.path.join(input_savepath,'inputdata.pkl'),'wb') as file:
+    with open(os.path.join(input_savepath,'svinputdata.pkl'),'wb') as file:
         pickle.dump(save_dict,file)
 
     print(f'Input data processed and saved to {input_savepath}')
