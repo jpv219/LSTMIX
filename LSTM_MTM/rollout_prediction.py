@@ -17,6 +17,10 @@ from sklearn.metrics import r2_score
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from matplotlib.ticker import FormatStrFormatter 
 from scipy.stats import wasserstein_distance
+import time
+import tracemalloc
+from memory_profiler import profile
+import sys
 
 ## Env. variables ##
 
@@ -71,8 +75,13 @@ feature_labels = {
 ####################################### ROLLOUT PREDICTION #####################################
 
 # Predict future values using rollout procedure with trained LSTM model
+@profile(precision=4)
 def rollout(model, input_seq, steps_out,total_steps):
     
+    #Tracking rollout performance metrics
+    t_start = time.time()
+    tracemalloc.start
+
     ## setting to eval mode and dropping gradient calculation for prediction
     model.eval()
     with torch.no_grad():
@@ -85,7 +94,6 @@ def rollout(model, input_seq, steps_out,total_steps):
 
         ### how many predicted windows will be calculated based on the input_steps
         num_forwards = int(total_steps / steps_out) + 1
-        print(f'prediction iterates for {num_forwards} times.')
 
         ## window predicton
         for _ in range(num_forwards):
@@ -96,7 +104,13 @@ def rollout(model, input_seq, steps_out,total_steps):
             rolled_predictions.append(output.detach().clone())
 
         # Concatenate all predictions into a single tensor
-        rolled_predictions = torch.cat(rolled_predictions, dim=1)               
+        rolled_predictions = torch.cat(rolled_predictions, dim=1)
+
+    # Gathering performance metrics
+    print(f'Rollout execution time: {time.time() - t_start}')
+    current, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    print(f"Memory usage throughout the training procedure {current / 10**6}MB; Peak was {peak / 10**6}MB")            
 
     return rolled_predictions
 
@@ -306,10 +320,6 @@ def plot_rollout_pred(rollout_seq, true_data, input_steps, features,set_labels, 
         # Loop over features: drop size range
         bin_idxs = 8 #num_features - 2
         fig2,axes2 = plt.subplots(1,int(bin_idxs/2), figsize=(int(bin_idxs/2*5),5))
-        # fig2,axes2 = plt.subplots(2,int(bin_idxs/2), figsize=(int(bin_idxs/2*6),10))
-        # fig2.tight_layout(rect=[0.05,0.02,1,0.9]) # [left, bottom, right, top]
-        # fig2.subplots_adjust(wspace=0.2)
-
 
         for f, f_idx in enumerate([4,6,7,9]):#range(2, num_features):
             # looping through cases
@@ -322,7 +332,7 @@ def plot_rollout_pred(rollout_seq, true_data, input_steps, features,set_labels, 
             
                 ## truedata shaped as (timesteps, cases, features) and rollout as (case,timestep,features)
                 r2 = r2_score(true_data[:,i,f_idx],rollout_seq[i,:,f_idx][:true_data.shape[0]])
-                # print(f' R2 {case}, {title_label}: {r2}')
+                print(f' R2 {case}, {title_label}: {r2}')
 
                 p = ax.plot(true_data[:,i,f_idx], label=f'Target {plot_label}',color = colors[i % len(colors)],linewidth = 3)
 
@@ -351,7 +361,6 @@ def plot_rollout_pred(rollout_seq, true_data, input_steps, features,set_labels, 
         fig2.tight_layout(rect=[0.03,0.05,1,1])#rect=[0.05,0.05,1,0.05])# [left, bottom, right, top]
         fig2.supxlabel('Time steps', fontsize=30,fontweight='bold')
         fig2.supylabel(r'$\hat{n}$', fontsize=40,fontweight='bold')
-        # fig2.suptitle(f'Rollout with LSTM {model_name} for DSD bins', fontsize=40)
         fig.subplots_adjust(wspace=0.2)
 
         fig2.savefig(os.path.join(fig_savepath,'rollouts',f'{model_name}', f'Rollout_{model_name}_DSD.png'), dpi=150)
@@ -435,10 +444,8 @@ def plot_EMD(rollout_seq, true_data, input_steps, set_labels, bin_edges, model_n
         for axis in ['top', 'bottom', 'left', 'right']:
             axes.spines[axis].set_linewidth(1.5)  # change width
                 
-    # fig1.suptitle(f'Comparison between Target and Prediction from {model_name}',fontweight='bold')
     fig.tight_layout()
     fig.savefig(os.path.join(fig_savepath, 'temporal_EMD',model_name,f'EMD_{model_name}_DSD_{t}.png'), dpi=150)
-        # plt.show()
 
 # y_x error dispersion for training/validation
 def plot_y_x(model, model_name,set_labels, features,
@@ -658,6 +665,10 @@ def plot_rollout_yx(rollout_seq, true_data, input_steps, set_labels, features, m
 
 def main():
     
+    #Tracking code performance
+    start_time = time.time()
+    tracemalloc.start()
+
     # Reading saved re-shaped input data from file
     with open(os.path.join(input_savepath,'inputdata.pkl'), 'rb') as file:
         input_pkg = pickle.load(file)
@@ -802,15 +813,25 @@ def main():
     total_steps = test_arr.shape[0] - hyperparams["steps_in"]
 
     ## Calling rollout prediction for test data
-    rollout_seq = rollout(model,input_seq,hyperparams["steps_out"],total_steps)
+    logtest_path = os.path.join(fig_savepath,'performance_logs',f'{model}_testroll.txt')
+
+    with open(logtest_path,'w') as logfile:
+        sys.stdout = logfile
+        rollout_seq = rollout(model,input_seq,hyperparams["steps_out"],total_steps)
 
     ## Calling rollout on training and validation data
 
     input_train = train_arr[:hyperparams['steps_in'],:,:]
     input_val = val_arr[:hyperparams['steps_in'],:,:]
+    logtrain_path = os.path.join(fig_savepath,'performance_logs',f'{model}_trainroll.txt')
 
-    rollout_train = rollout(model,input_train,hyperparams['steps_out'],total_steps)
-    rollout_val = rollout(model,input_val,hyperparams['steps_out'],total_steps)
+    with open(logtrain_path,'w') as logfile:
+        sys.stdout = logfile
+        rollout_train = rollout(model,input_train,hyperparams['steps_out'],total_steps)
+        rollout_val = rollout(model,input_val,hyperparams['steps_out'],total_steps)
+    
+    # Restore stdout to the console
+    sys.stdout = sys.__stdout__
 
     ## Plotting yx on train and val rollouts
 
@@ -843,5 +864,13 @@ def main():
         if t_evol_choice.lower() == 'y':
             plot_rollout_dist(rollout_seq,test_arr, hyperparams['steps_in'], splitset_labels[2], bin_edges, model_choice)
             plot_EMD(rollout_seq,test_arr, hyperparams['steps_in'], splitset_labels[2], bin_edges, model_choice)
+
+    #Reporting code performance
+    print(f'Total time consumed for {model} rollout predictions and plotting: {(time.time()-start_time)/60} min')
+
+    current, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    print(f"Memory usage throughout the rollout and plotting procedures {current / 10**6}MB; Peak was {peak / 10**6}MB")
+
 if __name__ == "__main__":
     main()

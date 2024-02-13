@@ -90,8 +90,9 @@ class RawData_processing():
             raise FileNotFoundError(f"Neither {file_name_gvol} nor {file_name_vol} found.")
         
         # Extract number of drops (Nd) and interfacial area (IntA)
-        Nd = Load_Clean_DF.extract_Nd(case)
-        IntA = Load_Clean_DF.extract_IA(case)
+        IntA = pd.read_csv(os.path.join(raw_datapath,'IA',f'{case}_IA.csv'))
+        Nd = df_Vol['Volume'].apply(lambda x: len(x))
+        
 
         return df_Vol, Nd, IntA
 
@@ -107,8 +108,8 @@ class RawData_processing():
             # Extract raw data
             df_Vol, Nd, IntA = self.import_rawdata(case)
             
-            time = Nd['Time']
-            n_drops = Nd['Ndrops']
+            time = IntA['Time']
+            n_drops = Nd
             IA = IntA['IA']
             DSD = df_Vol['Volume']
 

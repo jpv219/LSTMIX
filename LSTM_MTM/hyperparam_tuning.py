@@ -19,6 +19,9 @@ import os
 from functools import partial
 import sys
 from contextlib import redirect_stdout
+import time
+import tracemalloc
+from memory_profiler import profile
 
 import ray
 from ray import tune
@@ -210,6 +213,10 @@ def further_train(model_choice, init_training, X_tens, y_tens, best_trial,best_c
 
 def main():
 
+    #Code performance tracking metrics
+    start_time = time.time()
+    tracemalloc.start()
+    
     model_choice = input('Select a LSTM model to tune (DMS, S2S): ')
     
     ## Load windowed tensors for training and val
@@ -316,6 +323,13 @@ def main():
     }
         
         further_train(model_choice,init_training,X_tens,y_tens,best_trial,best_chkpoint)
+
+    #Reporting code performance
+    print(f'Total time consumed for {model_choice} hyperparameter tuning and further training: {(time.time()-start_time)/60} min')
+
+    current, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    print(f"Memory usage throughout the hyperparameter tuning process {current / 10**6}MB; Peak was {peak / 10**6}MB")
 
 
 if __name__ == "__main__":

@@ -17,6 +17,10 @@ import torch.optim as optim
 import torch.utils.data as data
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from collections import namedtuple
+import time
+import tracemalloc
+from memory_profiler import profile
+import functools
 
 
 from tools_modeltraining import custom_loss, EarlyStopping
@@ -425,6 +429,24 @@ class LSTM_S2S(nn.Module):
         else:
             return 0
 
+##################################### DECORATORS #################################################
+
+# Custom memory profile decorator
+def decorator_factory(model):
+
+    def memprofile_decorator(func): 
+
+        file_path = os.path.join(trainedmod_savepath, f'{model}_logs', f"{model}_training_memlog.txt")
+
+        @profile(precision=4,stream=open(file_path,'w'))
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            return func(*args, **kwargs)
+
+        return wrapper
+    
+    return memprofile_decorator
+
 ##################################### INPUT_DATA FUN. ################################################
 
 def input_data(Allcases, feature_map,norm_columns,smoothing_method,smoothing_params):
@@ -611,7 +633,11 @@ def train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler,
     
     model_name = 'DMS'
 
-    with open(str(saveas)+'.txt', 'w') as f:
+    # Code performance tracking metrics
+    time_start = time.time()
+    tracemalloc.start()
+
+    with open(os.path.join(trainedmod_savepath,f'{model_name}_logs',str(saveas)+'.txt'), 'w') as f:
         print(model, file=f)
 
         ## If a checkpoint state is going to be further trained (e.g., from Ray Tune parametric sweep)
@@ -631,6 +657,7 @@ def train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler,
             early_stopping = EarlyStopping(model_name,patience=10, verbose=True)
 
         for epoch in range(num_epochs): #looping through epochs
+
             model.train() #set the model to train mode -- informing features to behave accordingly for training
             
             first_iteration = True
@@ -659,6 +686,7 @@ def train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler,
 
                 # Check the shapes in the first iteration of the first epoch
                 if epoch == 0 and first_iteration:
+                    t_epoch = time.time()
                     print('Input shape:', X_batch.shape)
                     print('Output shape:', y_pred.shape)
                     first_iteration = False
@@ -708,6 +736,9 @@ def train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler,
 
                 print('Epoch %d : train RMSE  %.4f, val RMSE %.4f ' % (epoch, t_rmse, v_rmse), file=f)
                 print('Epoch %d : train RMSE  %.4f, val RMSE %.4f ' % (epoch, t_rmse, v_rmse))
+
+                print(f'{check_epochs} epochs execution time: {time.time()-t_epoch} s',file=f)
+                t_epoch = time.time()
                 
             ## If in tuning mode, save checkpoint for model and optimizer state, and register checkpoint with train.report.
             if tuning:
@@ -731,6 +762,12 @@ def train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler,
                     print('Early stopping')
                     break
 
+        print(f'Training execution time: {(time.time() - time_start)/60} mins', file=f)
+
+        current, peak = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+        print(f"Memory usage throughout the training procedure {current / 10**6}MB; Peak was {peak / 10**6}MB",file=f)
+
     print('Finished training')
 
 def train_S2S(model, optimizer, loss_fn, trainloader,valloader,scheduler, num_epochs, 
@@ -751,8 +788,13 @@ def train_S2S(model, optimizer, loss_fn, trainloader,valloader,scheduler, num_ep
     '''
     model_name = 'S2S'
 
+    # Code performance tracking metrics
+    time_start = time.time()
+    tracemalloc.start()
+
     # save the training model
-    with open(str(saveas)+'.txt', 'w') as f:
+    with open(os.path.join(trainedmod_savepath,f'{model_name}_logs',str(saveas)+'.txt'), 'w') as f:
+
         print(model, file=f)
 
         ## If a checkpoint state is going to be further trained (e.g., from Ray Tune parametric sweep)
@@ -848,6 +890,7 @@ def train_S2S(model, optimizer, loss_fn, trainloader,valloader,scheduler, num_ep
 
                 # Check the shapes in the first iteration of the first epoch
                 if epoch == 0 and first_iteration:
+                    t_epoch = time.time()
                     print('Input shape:', X_batch.shape)
                     print('Output shape:', outputs.shape)
                     first_iteration = False
@@ -902,6 +945,9 @@ def train_S2S(model, optimizer, loss_fn, trainloader,valloader,scheduler, num_ep
 
                 print('Epoch %d : train RMSE  %.4f, val RMSE %.4f ' % (epoch, t_rmse, v_rmse), file=f)
                 print('Epoch %d : train RMSE  %.4f, val RMSE %.4f ' % (epoch, t_rmse, v_rmse))
+
+                print(f'{check_epochs} epochs execution time: {time.time()-t_epoch} s',file=f)
+                t_epoch = time.time()
                 
             ## If in tuning mode, save checkpoint for model and optimizer state, and register checkpoint with train.report.
             if tuning:
@@ -924,12 +970,22 @@ def train_S2S(model, optimizer, loss_fn, trainloader,valloader,scheduler, num_ep
                 if early_stopping.early_stop:
                     print('Early stopping')
                     break
-                
+                    
+        print(f'Training execution time: {(time.time() - time_start)/60} mins', file=f)
+
+        current, peak = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+        print(f"Memory usage throughout the training procedure {current / 10**6}MB; Peak was {peak / 10**6}MB",file=f)
+
     print('Finished training')
 
 ########################################### MAIN ########################################################
 
 def main():
+
+    #Tracking code performance
+    start_time = time.time()
+    tracemalloc.start()
 
     ####### WINDOW DATA ########
 
@@ -997,11 +1053,11 @@ def main():
 
     # Define hyperparameters
     input_size = X_train.shape[-1]  # Number of features in the input tensor
-    hidden_size = 128  # Number of hidden units in the LSTM cell, determines how many weights will be used in the hidden state calculations
+    hidden_size = 64  # Number of hidden units in the LSTM cell, determines how many weights will be used in the hidden state calculations
     output_size = y_train.shape[-1]  # Number of output features, same as input in this case
     pred_steps = steps_out # Number of future steps to predict
     batch_size = 36 # How many windows are being processed per pass through the LSTM
-    learning_rate = 0.005
+    learning_rate = 0.01
     num_epochs = 3000
     check_epochs = 100
 
@@ -1017,6 +1073,9 @@ def main():
     ## Calling model class instance and training function
     model_choice = input('Select a LSTM model to train (DMS, S2S): ')
 
+    # Creating a memory decorator from the factory
+    mem_profiler = decorator_factory(model_choice)
+
     if model_choice == 'DMS':
         # LSTM model instance
         model = LSTM_DMS(input_size, hidden_size, output_size, pred_steps,
@@ -1027,7 +1086,10 @@ def main():
         # Learning rate scheduler, set on min mode to decrease by factor when validation loss stops decreasing                                       
         scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=True)
         
-        train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler, 
+        #Decorating the training function with the memory profiler
+        train_DMS_dec = mem_profiler(train_DMS)
+        
+        train_DMS_dec(model, optimizer, loss_fn, trainloader, valloader, scheduler, 
             num_epochs, check_epochs, X_train, y_train, X_val, 
             y_val,saveas='DMS_out',batch_loss=False)
         
@@ -1041,7 +1103,10 @@ def main():
         # Learning rate scheduler, set on min mode to decrease by factor when validation loss stops decreasing                                       
         scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=True)
         
-        train_S2S(model,optimizer, loss_fn, trainloader, valloader, scheduler, num_epochs, 
+        #Decorating the training function with the memory profiler
+        train_S2S_dec = mem_profiler(train_S2S)
+        
+        train_S2S_dec(model,optimizer, loss_fn, trainloader, valloader, scheduler, num_epochs, 
                   check_epochs,pred_steps,X_train,y_train, X_val, y_val,
                   tf_ratio, dynamic_tf, training_prediction= 'mixed',
                   saveas='S2S_out',batch_loss=False)
@@ -1064,6 +1129,13 @@ def main():
     )
 
     saving_data(windowed_data,hyper_params,model_choice)
+
+    #Reporting code performance
+    print(f'Total time consumed for {model} data processing, training and packaging: {(time.time()-start_time)/60} min')
+
+    current, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    print(f"Memory usage throughout the training,processing and packaging procedure {current / 10**6}MB; Peak was {peak / 10**6}MB")
 
 if __name__ == "__main__":
     main()
