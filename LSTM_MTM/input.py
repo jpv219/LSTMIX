@@ -18,6 +18,9 @@ import pickle
 import random
 import math
 import copy
+# For input preprocessing methods for different mixers
+import configparser
+import ast
 
 ## Env. variables ##
 
@@ -27,12 +30,12 @@ import copy
 #fig_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/figs/'
 #input_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX//LSTM_MTM/input_data/'
 
-#fig_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/figs/'
-#input_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/input_data/'
-#raw_datapath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/RawData'
-trainedmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/trained_models/'
-input_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/input_data/'
-raw_datapath = '/home/jpv219/Documents/ML/LSTM_SMX/RawData/'
+fig_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/figs/'
+input_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/input_data/'
+raw_datapath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/RawData'
+# trainedmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/trained_models/'
+# input_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/input_data/'
+# raw_datapath = '/home/jpv219/Documents/ML/LSTM_SMX/RawData/'
 
 ## Plot setup
 
@@ -368,21 +371,21 @@ class Post_processing():
         if method == 'moveavg':
             if window_size is None:
                 raise ValueError('Window size required')
-            smoothed_data = pd.DataFrame(smoothed_features).rolling(window_size, axis = 0).mean()
+            smoothed_data = pd.DataFrame(smoothed_features).rolling(int(window_size), axis = 0).mean()
             smoothed_data.fillna(pd.DataFrame(smoothed_features),inplace=True)
         ## SavGol filter based on fitting least-squares polynomial to a window of data points
         elif method == 'savgol':
             if window_size is None or poly_order is None:
                 raise ValueError('Mising input arguments: Windowsize/polyorder')
             smoothed_data = np.apply_along_axis(
-                        lambda col: savgol_filter(col, window_size, poly_order),
+                        lambda col: savgol_filter(col, int(window_size), int(poly_order)),
                         axis = 0, arr=smoothed_features)
         ## Locally Weighted Scatterplot Smoothing, locally fitting linear regressions
         elif method == 'lowess':
             if lowess_frac is None:
                 raise ValueError('Lowess fraction required')
             smoothed_data = np.apply_along_axis(
-                        lambda col: lowess(col,np.arange(len(col)),frac = lowess_frac,return_sorted=False),
+                        lambda col: lowess(col,np.arange(len(col)),frac = float(lowess_frac),return_sorted=False),
                         axis = 0, arr = smoothed_features)
         else:
             raise ValueError('Unsupported smoothing method')
@@ -492,7 +495,7 @@ class Post_processing():
 
 ## SETUP DSD METHOD ##
 
-def setup_DSD(n_bins,cases,feature_map,DSD_columns,pre_dict):
+def setup_DSD(n_bins,leftmost,rightmost,cases,feature_map,DSD_columns,pre_dict):
     
     ## building features to represent all DSD bins
     for i in range(0,n_bins):
@@ -502,8 +505,6 @@ def setup_DSD(n_bins,cases,feature_map,DSD_columns,pre_dict):
     
     ## DSD processing class
     DSD_processor = DSD_processing(cases=cases, num_bins=n_bins)
-    leftmost=1
-    rightmost=10
 
     ## Pre_dict with bins and drop counts assigned: dc - dropcounts
     pre_dict_dc, bin_edges = DSD_processor.sort_into_bins(pre_dict)
@@ -526,12 +527,14 @@ def setup_DSD(n_bins,cases,feature_map,DSD_columns,pre_dict):
 ## main ##
 
 def main():
-
-    Allcases = ['bi001', 'bi01', 'b09', 'b06pm', 'b03', 'da01pm', 'da01', 'bi01pm', '3d', 'alt1', 'alt4_b09','b03a','b09a','bi01a','bi1a',
-         'PM', 'bi001pm', 'bi1', 'alt3','alt1_b09','alt4_f','b06a',
-         'b06', 'b09pm', 'da1', 'da001','alt2','bi001a','FPM']
     
-    #Allcases = ['Bi0001','Bi0004','Bi001','B05','B07','5hz','6hz','7hz','9hz','10hz','B09','Bi1','Bi0002','8hz']
+    # Read the case-specific info from config file
+    mixer_choice = input('Choose the mixing system you would like to pre-process (static/stirred): ')
+
+    config = configparser.ConfigParser()
+    config.read(os.path.join(raw_datapath,f'config_{mixer_choice}.ini'))
+
+    Allcases = ast.literal_eval(config.get('Cases', 'cases'))
 
     # Randomizing cases for different train-test set splitting
     cases = random.sample(Allcases,len(Allcases))
@@ -559,8 +562,10 @@ def main():
     ## Including DSD data for LSTM prediction: pre-process and data preparation
     if DSD_choice.lower() == 'y':
 
-        n_bins = 12
-        dc_copy, DSD_columns, bin_edges, feature_map = setup_DSD(n_bins,Allcases,feature_map,DSD_columns,pre_dict)
+        n_bins = int(config['DSD']['n_bins'])
+        leftmost = int(config['DSD']['leftmost'])
+        rightmost = int(config['DSD']['rightmost'])
+        dc_copy, DSD_columns, bin_edges, feature_map = setup_DSD(n_bins,leftmost,rightmost,Allcases,feature_map,DSD_columns,pre_dict)
 
     ######## POST-PROCESSING ######
 
@@ -592,9 +597,14 @@ def main():
     post_processor.plot_inputdata(fine_labels,shaped_input)
 
     # smoothing data
-    smoothed_data = post_processor.smoothing(shaped_input,'savgol',window_size=5,poly_order=3)
+    method = config['Smoothing']['method']
+    window_size = config['Smoothing']['window_size']
+    poly_order = config['Smoothing']['poly_order']
+    lowess_frac = config['Smoothing']['lowess_frac']
 
-    post_processor.plot_smoothdata(shaped_input, smoothed_data,fine_labels, 'savgol')
+    smoothed_data = post_processor.smoothing(shaped_input,method=method,window_size=window_size,poly_order=poly_order,lowess_frac=lowess_frac)
+
+    post_processor.plot_smoothdata(shaped_input, smoothed_data,fine_labels, method)
 
     ## saving input data 
 
@@ -604,7 +614,7 @@ def main():
     if DSD_choice.lower() == 'y':
         save_dict['bin_edges'] = bin_edges
 
-    with open(os.path.join(input_savepath,'svinputdata.pkl'),'wb') as file:
+    with open(os.path.join(input_savepath,'inputdata.pkl'),'wb') as file:
         pickle.dump(save_dict,file)
 
     print(f'Input data processed and saved to {input_savepath}')

@@ -19,9 +19,11 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from collections import namedtuple
 import time
 import tracemalloc
-from memory_profiler import profile
+# from memory_profiler import profile
 from functools import wraps
-
+# For input preprocessing methods for different mixers
+import configparser
+import ast
 
 from tools_modeltraining import custom_loss, EarlyStopping
 from input import Post_processing
@@ -50,6 +52,7 @@ fig_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/figs/'
 input_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/input_data/'
 trainedmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/trained_models/'
 tuningmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/tuning/'
+raw_datapath = '/home/pv219/Documents/ML/LSTM_SMX/RawData'
 
 ## Plot setup
 
@@ -981,18 +984,23 @@ def main():
     #Tracking code performance
     start_time = time.time()
     tracemalloc.start()
+    
+    # Read the case-specific info from config file
+    mixer_choice = input('Choose the mixing system you would like to pre-process (static/stirred): ')
+    config = configparser.ConfigParser()
+    config.read(os.path.join(raw_datapath,f'config_{mixer_choice}.ini'))
 
     ####### WINDOW DATA ########
 
     ## Windowing hyperparameters
-    steps_in, steps_out = 40, 30
-    stride = 1
+    steps_in, steps_out = config['Windowing']['steps_in'], config['Windowing']['steps_out']
+    stride = config['Windowing']['stride']
 
     ## Smoothing parameters
-    smoothing_method = 'savgol'
-    window_size = 5 # needed for moveavg and savgol
-    poly_order = 3 # needed for savgol
-    lowess_frac = 0.03 #needed for lowess
+    smoothing_method = config['Smoothing']['method']
+    window_size = config['Smoothing']['window_size']# needed for moveavg and savgol
+    poly_order = config['Smoothing']['poly_order']# needed for savgol
+    lowess_frac = config['Smoothing']['lowess_frac']#needed for lowess
 
     smoothing_params = (window_size,poly_order,lowess_frac)
 
@@ -1002,9 +1010,7 @@ def main():
     if choice.lower() == 'y':
 
         ## Cases to split and features to read from 
-        Allcases = ['bi001', 'bi01', 'b09', 'b06pm', 'b03', 'da01pm', 'da01', 'bi01pm', '3d', 'alt1', 'alt4_b09','b03a','b09a','bi01a','bi1a',
-        'PM', 'bi001pm', 'bi1', 'alt3','alt1_b09','alt4_f','b06a',
-        'b06', 'b09pm', 'da1', 'da001','alt2','bi001a','FPM']
+        Allcases = ast.literal_eval(config.get('Cases', 'cases'))
 
         #Random sampling
         cases = random.sample(Allcases,len(Allcases))
@@ -1033,8 +1039,8 @@ def main():
         bin_edges = bins
 
     ## data splitting for training, validating and testing
-    train_frac = 9/16
-    test_frac = 4/16
+    train_frac = float(config['Splitting']['train_frac'])
+    test_frac = float(config['Splitting']['test_frac'])
 
     windowed_data = windowing(steps_in,steps_out,stride,train_frac, test_frac, input_df, Allcases,features,bin_edges)
 
