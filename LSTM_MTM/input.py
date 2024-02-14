@@ -151,8 +151,8 @@ class DSD_processing():
                 lambda x: np.log10(x/v_cap).astype('float32'))
             
             ## find max/min value in each volume array per time through lambda fun
-            max_val = pre_dict[case]['Vol'].apply(lambda x: np.max(x)) #list of max value for each time
-            min_val = pre_dict[case]['Vol'].apply(lambda x: np.min(x))
+            max_val = pre_dict[case]['Vol'].apply(lambda x: np.max(x) if len(x) > 0 else 0) #list of max value for each time
+            min_val = pre_dict[case]['Vol'].apply(lambda x: np.min(x) if len(x) > 0 else 0)
 
             # extracting max/min value for all times and appending per case
             max_list.append(max(max_val))
