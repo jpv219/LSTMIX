@@ -86,7 +86,7 @@ def main():
 
     windowed_data = trn.windowing(steps_in,steps_out,stride,train_frac, test_frac, input_df, Allcases,features,bin_edges)
 
-    model_choice = input('Which model would you like to generate data for? (DMS/S2S): ')
+    model_choice = input('Which model would you like to generate data for? (LSTM-FC,LSTM-ED,GRU-FC): ')
 
     trn.saving_data(windowed_data,hp={},model_choice=model_choice,save_hp=False)
 

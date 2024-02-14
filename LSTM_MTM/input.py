@@ -30,12 +30,13 @@ import ast
 #fig_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/figs/'
 #input_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX//LSTM_MTM/input_data/'
 
-fig_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/figs/'
-input_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/input_data/'
-raw_datapath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/RawData'
-# trainedmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/trained_models/'
-# input_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/input_data/'
-# raw_datapath = '/home/jpv219/Documents/ML/LSTM_SMX/RawData/'
+# fig_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/figs/'
+# input_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/input_data/'
+# raw_datapath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/RawData'
+trainedmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/trained_models/'
+input_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/input_data/'
+fig_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM//figs/'
+raw_datapath = '/home/jpv219/Documents/ML/LSTM_SMX/RawData/'
 
 ## Plot setup
 
