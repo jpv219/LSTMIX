@@ -19,7 +19,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from collections import namedtuple
 import time
 import tracemalloc
-# from memory_profiler import profile
+from memory_profiler import profile
 from functools import wraps
 # For input preprocessing methods for different mixers
 import configparser
@@ -52,7 +52,7 @@ fig_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/figs/'
 input_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/input_data/'
 trainedmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/trained_models/'
 tuningmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/tuning/'
-raw_datapath = '/home/pv219/Documents/ML/LSTM_SMX/RawData'
+raw_datapath = '/home/jpv219/Documents/ML/LSTM_SMX/RawData'
 
 ## Plot setup
 
@@ -432,6 +432,39 @@ class LSTM_S2S(nn.Module):
         else:
             return 0
 
+class GRUNet(nn.Module):
+
+    # Class constructor
+    def __init__(self, input_size, hidden_size, output_size, pred_steps):
+
+        # Inhereting from nn.Module
+        super(GRUNet,self).__init__()
+
+        # GRU Attributes
+        self.hidden_size = hidden_size
+        self.pred_steps = pred_steps # prediction steps = steps_out
+        self.output_size = output_size # number of features per output step.
+
+        # GRU and linear layers
+        self.gru = nn.GRU(input_size,hidden_size,batch_first=True)
+        self.linear = nn.Linear(hidden_size,output_size*pred_steps)
+
+    def forward(self,input):
+
+        # GRU Layer
+        gru_output, _ = self.gru(input)
+
+        last_output = gru_output[:,-1,:]
+
+        # Fully connected linear layer for output decoding
+        multi_step_output = self.linear(last_output)
+
+        # Reshape the output to get predictions for multiple future time steps
+        multi_step_output = multi_step_output.view(-1, self.pred_steps, self.output_size)
+
+        return multi_step_output
+        
+
 ##################################### DECORATORS #################################################
 
 # Custom memory profile decorator
@@ -788,7 +821,6 @@ def train_S2S(model, optimizer, loss_fn, trainloader,valloader,scheduler, num_ep
 
     # Code performance tracking metrics
     time_start = time.time()
-    tracemalloc.start()
 
     # save the training model
     with open(os.path.join(trainedmod_savepath,f'{model_name}_logs',str(saveas)+'.txt'), 'w') as f:
@@ -972,11 +1004,10 @@ def train_S2S(model, optimizer, loss_fn, trainloader,valloader,scheduler, num_ep
         print(f'Training execution time: {(time.time() - time_start)/60} mins', file=f)
 
         current, peak = tracemalloc.get_traced_memory()
-        tracemalloc.stop()
         print(f"Memory usage throughout the training procedure {current / 10**6}MB; Peak was {peak / 10**6}MB",file=f)
 
     print('Finished training')
-
+        
 ########################################### MAIN ########################################################
 
 def main():
@@ -1072,7 +1103,7 @@ def main():
     valloader = data.DataLoader(data.TensorDataset(X_val, y_val), shuffle=True, batch_size=batch_size)
         
     ## Calling model class instance and training function
-    model_choice = input('Select a LSTM model to train (DMS, S2S): ')
+    model_choice = input('Select a LSTM model to train (LSTM-FC,LSTM-ED,GRU-FC): ')
 
     # Creating a memory decorator from the factory
 
