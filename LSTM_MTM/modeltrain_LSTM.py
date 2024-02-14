@@ -632,7 +632,6 @@ def train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler,
 
     # Code performance tracking metrics
     time_start = time.time()
-    tracemalloc.start()
 
     with open(os.path.join(trainedmod_savepath,f'{model_name}_logs',str(saveas)+'.txt'), 'w') as f:
         print(model, file=f)
@@ -762,7 +761,6 @@ def train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler,
         print(f'Training execution time: {(time.time() - time_start)/60} mins', file=f)
 
         current, peak = tracemalloc.get_traced_memory()
-        tracemalloc.stop()
         print(f"Memory usage throughout the training procedure {current / 10**6}MB; Peak was {peak / 10**6}MB",file=f)
 
     print('Finished training')
