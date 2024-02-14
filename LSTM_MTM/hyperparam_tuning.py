@@ -50,9 +50,12 @@ tuningmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/tuning/'
 ##################################### DECORATORS #################################################
 
 # Custom memory profile decorator
-def mem_profile(model):
+def mem_profile(folder,model):
 
-    file_path = os.path.join(tuningmod_savepath, model,'logs', f"{model}_tuning_memlog.txt")
+    if folder == 'tuning':
+        file_path = os.path.join(tuningmod_savepath, model,'logs', f"{model}_tuning_memlog.txt")
+    else:
+        file_path = os.path.join(trainedmod_savepath, f'{model}_logs', f"{model}_furthertrain_memlog.txt")
 
     def decorator(func):
         @wraps(func)
@@ -222,7 +225,8 @@ def further_train(model_choice, init_training, X_tens, y_tens, best_trial,best_c
             file.write(f"{key}: {value}\n")
 
     ## Set to train further mode
-    train_tune(config_training, model_choice, init_training, X_tens, y_tens, best_chkpt_path, tuning=False)
+    train_tune_dec = mem_profile(folder='training',model=model_choice)(train_tune)
+    train_tune_dec(config_training, model_choice, init_training, X_tens, y_tens, best_chkpt_path, tuning=False)
 
 
 ########################################### MAIN ###########################################
@@ -297,7 +301,7 @@ def main():
     log_file_path = os.path.join(tuningmod_savepath,model_choice,f'logs/{model_choice}_tune_out.log')
 
     #Decorate the tuner
-    tune_dec = mem_profile(model=model_choice)(run_tuning)
+    tune_dec = mem_profile(folder='tuning',model=model_choice)(run_tuning)
 
     # Run the experiment
     tuner = tune_dec(search_space, model_choice, init, X_tens, 

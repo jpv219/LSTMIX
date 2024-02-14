@@ -80,7 +80,6 @@ def rollout(model, input_seq, steps_out,total_steps):
     
     #Tracking rollout performance metrics
     t_start = time.time()
-    tracemalloc.start
 
     ## setting to eval mode and dropping gradient calculation for prediction
     model.eval()
@@ -109,7 +108,6 @@ def rollout(model, input_seq, steps_out,total_steps):
     # Gathering performance metrics
     print(f'Rollout execution time: {time.time() - t_start}')
     current, peak = tracemalloc.get_traced_memory()
-    tracemalloc.stop()
     print(f"Memory usage throughout the training procedure {current / 10**6}MB; Peak was {peak / 10**6}MB")            
 
     return rolled_predictions
