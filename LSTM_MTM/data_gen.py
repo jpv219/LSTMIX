@@ -16,7 +16,7 @@ import ast
 ## env. variables 
 trainedmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/trained_models/'
 input_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/input_data/'
-raw_datapath = '/home/pv219/Documents/ML/LSTM_SMX/RawData'
+raw_datapath = '/home/jpv219/Documents/ML/LSTM_SMX/RawData/'
 
 #trainedmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/trained_models/'
 #input_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/input_data/'
@@ -35,14 +35,19 @@ def main():
 
     ####### WINDOW DATA ########
 
-    steps_in, steps_out = config['Windowing']['steps_in'], config['Windowing']['steps_out']
-    stride = config['Windowing']['stride']
+    steps_in, steps_out = int(config['Windowing']['steps_in']), int(config['Windowing']['steps_out'])
+    stride = int(config['Windowing']['stride'])
 
     ## Smoothing parameters
     smoothing_method = config['Smoothing']['method']
     window_size = config['Smoothing']['window_size']# needed for moveavg and savgol
     poly_order = config['Smoothing']['poly_order']# needed for savgol
     lowess_frac = config['Smoothing']['lowess_frac']#needed for lowess
+
+    ## DSD bin data
+    n_bins = int(config['DSD']['n_bins'])
+    leftmost = int(config['DSD']['leftmost'])
+    rightmost = int(config['DSD']['rightmost'])
 
     smoothing_params = (window_size,poly_order,lowess_frac)
 
@@ -63,7 +68,7 @@ def main():
                     }
         norm_columns = ['Number of drops', 'Interfacial Area']
 
-        trn.input_data(Allcases,feature_map,norm_columns,smoothing_method,smoothing_params)
+        trn.input_data(Allcases,n_bins, leftmost, rightmost, feature_map,norm_columns,smoothing_method,smoothing_params)
 
     # Reading saved re-shaped input data from file
     with open(os.path.join(input_savepath,'inputdata.pkl'), 'rb') as file:
@@ -86,7 +91,7 @@ def main():
 
     windowed_data = trn.windowing(steps_in,steps_out,stride,train_frac, test_frac, input_df, Allcases,features,bin_edges)
 
-    model_choice = input('Which model would you like to generate data for? (LSTM-FC,LSTM-ED,GRU-FC): ')
+    model_choice = input('Which model would you like to generate data for? (LSTM_FC,LSTM_ED,GRU_FC): ')
 
     trn.saving_data(windowed_data,hp={},model_choice=model_choice,save_hp=False)
 

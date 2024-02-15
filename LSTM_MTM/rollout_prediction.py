@@ -11,7 +11,7 @@ import torch
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import seaborn as sns
-from modeltrain_LSTM import LSTM_DMS, LSTM_S2S
+from modeltrain_LSTM import LSTM_FC, LSTM_ED, GRU_FC
 import numpy as np
 from sklearn.metrics import r2_score
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
@@ -679,8 +679,12 @@ def main():
     else:
         bin_edges = bins
 
-    ## Select LSTM model trained to use for predictions and plots
-    model_choice = input('Select a LSTM model to use for predictions (DMS, S2S): ')
+    ## Selection of Neural net architecture and RNN unit type
+    net_choice = input('Select a network to use for predictions (GRU/LSTM): ')
+
+    arch_choice = input('Select the specific network architecture (FC/ED): ')
+
+    model_choice = net_choice + '_' + arch_choice
 
     ##### LOADING MODEL, HYPERPARAMS AND DATA ######
     
@@ -722,13 +726,18 @@ def main():
     
     wind_size = hyperparams["steps_in"] + hyperparams["steps_out"]
 
-    if model_choice == 'DMS':
-        model = LSTM_DMS(hyperparams["input_size"], hyperparams["hidden_size"],
+    if model_choice == 'LSTM_FC':
+        model = LSTM_FC(hyperparams["input_size"], hyperparams["hidden_size"],
                          hyperparams["output_size"], hyperparams["pred_steps"],
                             l1_lambda=0.00, l2_lambda=0.00)
-    elif model_choice == 'S2S':
-        model = LSTM_S2S(hyperparams["input_size"], hyperparams["hidden_size"],
-                         hyperparams["output_size"],hyperparams["pred_steps"])
+    elif model_choice == 'LSTM_ED':
+        model = LSTM_ED(hyperparams["input_size"], hyperparams["hidden_size"],
+                         hyperparams["output_size"],hyperparams["pred_steps"],
+                         l1_lambda=0.00, l2_lambda=0.00)
+    elif model_choice == 'GRU_FC':
+        model = GRU_FC(hyperparams["input_size"], hyperparams["hidden_size"],
+                         hyperparams["output_size"], hyperparams["pred_steps"],
+                            l1_lambda=0.00, l2_lambda=0.00)
 
 
     ## Load the last best model before training degrades         

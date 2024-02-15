@@ -246,14 +246,14 @@ class Window_data():
         # number of windows is determined via Tfinal - steps out - steps in + 1
         return torch.tensor(X_array), torch.tensor(y_array), np.array(casebatch_lens)
 
-class LSTM_DMS(nn.Module):
+class LSTM_FC(nn.Module):
     
     ## class constructor
     def __init__(self, input_size, hidden_size, output_size, pred_steps,
                  l1_lambda=0.0, l2_lambda=0.0):
         
         # calling the constructor of the parent class nn.Module to properly intialize this class
-        super(LSTM_DMS,self).__init__()
+        super(LSTM_FC,self).__init__()
 
         #LSTM attributes
         self.hidden_size = hidden_size
@@ -364,13 +364,13 @@ class LSTM_decoder(nn.Module):
         
         return output
     
-class LSTM_S2S(nn.Module):
+class LSTM_ED(nn.Module):
     ''' Double LSTM Encoder-decoder architecture to make predictions '''
 
     #Constructing the encoder decoder LSTM architecture
     def __init__(self, input_size, hidden_size, output_size, pred_steps,
                  l1_lambda=0.0, l2_lambda=0.0):
-        super(LSTM_S2S,self).__init__()
+        super(LSTM_ED,self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.output_size = output_size
@@ -432,18 +432,23 @@ class LSTM_S2S(nn.Module):
         else:
             return 0
 
-class GRUNet(nn.Module):
+class GRU_FC(nn.Module):
 
     # Class constructor
-    def __init__(self, input_size, hidden_size, output_size, pred_steps):
+    def __init__(self, input_size, hidden_size, output_size, pred_steps,l1_lambda=0.0, l2_lambda=0.0):
 
         # Inhereting from nn.Module
-        super(GRUNet,self).__init__()
+        super(GRU_FC,self).__init__()
 
         # GRU Attributes
         self.hidden_size = hidden_size
         self.pred_steps = pred_steps # prediction steps = steps_out
         self.output_size = output_size # number of features per output step.
+
+
+        # Relevance markers for L1 and L2 regularizations
+        self.l1_lambda = l1_lambda
+        self.l2_lambda = l2_lambda
 
         # GRU and linear layers
         self.gru = nn.GRU(input_size,hidden_size,batch_first=True)
@@ -463,6 +468,27 @@ class GRUNet(nn.Module):
         multi_step_output = multi_step_output.view(-1, self.pred_steps, self.output_size)
 
         return multi_step_output
+
+    ### Regularization functions to prevent overfitting
+    #L1 (lasso) encourages sparse weights
+    def l1_regularization_loss(self):
+        if self.training:
+            l1_loss = 0.0
+            for param in self.parameters():
+                l1_loss += torch.sum(torch.abs(param))
+            return self.l1_lambda * l1_loss
+        else:
+            return 0
+
+    #L2 (Ridge) encourages small weights
+    def l2_regularization_loss(self):
+        if self.training:
+            l2_loss = 0.0
+            for param in self.parameters():
+                l2_loss += torch.sum(param ** 2)
+            return 0.5 * self.l2_lambda * l2_loss
+        else:
+            return 0
         
 
 ##################################### DECORATORS #################################################
@@ -482,7 +508,7 @@ def mem_profile(model):
 
 ##################################### INPUT_DATA FUN. ################################################
 
-def input_data(Allcases, feature_map,norm_columns,smoothing_method,smoothing_params):
+def input_data(Allcases, n_bins, leftmost, rightmost, feature_map,norm_columns,smoothing_method,smoothing_params):
 
     DSD_columns = []
 
@@ -498,8 +524,7 @@ def input_data(Allcases, feature_map,norm_columns,smoothing_method,smoothing_par
     ## Including DSD data for LSTM prediction: pre-process and data preparation
     if DSD_choice.lower() == 'y':
         
-        n_bins = 12
-        dc_copy, DSD_columns, bin_edges, feature_map = ipt.setup_DSD(n_bins,Allcases,feature_map,DSD_columns,pre_dict)
+        dc_copy, DSD_columns, bin_edges, feature_map = ipt.setup_DSD(n_bins,leftmost,rightmost,Allcases,feature_map,DSD_columns,pre_dict)
 
     ### POST-PROCESSING ###
     ipt_pp = Post_processing(Allcases, norm_columns,
@@ -659,12 +684,11 @@ def saving_data(wd,hp,model_choice,save_hp=True):
 
 ####################################### TRAINING FUN. #################################################
 
-def train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler,
+def train_FC(model_name, model, optimizer, loss_fn, trainloader, valloader, scheduler,
                   num_epochs, check_epochs, 
                   X_train, y_train, X_val, y_val, saveas,
                   batch_loss = False,tuning=False):
     
-    model_name = 'DMS'
 
     # Code performance tracking metrics
     time_start = time.time()
@@ -686,7 +710,7 @@ def train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler,
 
         else:
             ### Early stopping feature to avoid overfitting during training, monitoring a minimum improvement threshold
-            early_stopping = EarlyStopping(model_name,patience=10, verbose=True)
+            early_stopping = EarlyStopping(model_name,patience=2, verbose=True)
 
         for epoch in range(num_epochs): #looping through epochs
 
@@ -801,7 +825,7 @@ def train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler,
 
     print('Finished training')
 
-def train_S2S(model, optimizer, loss_fn, trainloader,valloader,scheduler, num_epochs, 
+def train_ED(model_name, model, optimizer, loss_fn, trainloader,valloader,scheduler, num_epochs, 
               check_epochs, pred_steps, X_train, y_train, X_val, y_val, 
               tf_ratio, dynamic_tf,training_prediction,saveas,
               batch_loss=False,tuning=False):
@@ -817,7 +841,6 @@ def train_S2S(model, optimizer, loss_fn, trainloader,valloader,scheduler, num_ep
     
     return loss: array of loss function for each epoch
     '''
-    model_name = 'S2S'
 
     # Code performance tracking metrics
     time_start = time.time()
@@ -840,7 +863,7 @@ def train_S2S(model, optimizer, loss_fn, trainloader,valloader,scheduler, num_ep
                         optimizer.load_state_dict(loaded_checkpoint_state['optimizer_state_dict'])
         else:
             ### Early stopping feature to avoid overfitting during training, monitoring a minimum improvement threshold
-            early_stopping = EarlyStopping(model_name,patience=10, verbose=True)
+            early_stopping = EarlyStopping(model_name,patience=2, verbose=True)
 
         for epoch in range(num_epochs): #looping through training epochs
             
@@ -1024,8 +1047,8 @@ def main():
     ####### WINDOW DATA ########
 
     ## Windowing hyperparameters
-    steps_in, steps_out = config['Windowing']['steps_in'], config['Windowing']['steps_out']
-    stride = config['Windowing']['stride']
+    steps_in, steps_out = int(config['Windowing']['steps_in']), int(config['Windowing']['steps_out'])
+    stride = int(config['Windowing']['stride'])
 
     ## Smoothing parameters
     smoothing_method = config['Smoothing']['method']
@@ -1034,6 +1057,11 @@ def main():
     lowess_frac = config['Smoothing']['lowess_frac']#needed for lowess
 
     smoothing_params = (window_size,poly_order,lowess_frac)
+
+    ## DSD bin data
+    n_bins = int(config['DSD']['n_bins'])
+    leftmost = int(config['DSD']['leftmost'])
+    rightmost = int(config['DSD']['rightmost'])
 
     ## Re process raw data to swap cases between train, validation and test split sets. Order will depend on Allcases list and train/test fracs.
     choice = input('Re-process raw data sets before windowing? (y/n) : ')
@@ -1052,7 +1080,7 @@ def main():
                     }
         norm_columns = ['Number of drops', 'Interfacial Area']
 
-        input_data(Allcases,feature_map,norm_columns,smoothing_method,smoothing_params)
+        input_data(Allcases,n_bins,leftmost, rightmost, feature_map,norm_columns,smoothing_method,smoothing_params)
 
     # Reading saved re-shaped input data from file
     with open(os.path.join(input_savepath,'inputdata.pkl'), 'rb') as file:
@@ -1102,16 +1130,27 @@ def main():
     trainloader = data.DataLoader(data.TensorDataset(X_train, y_train), shuffle=True, batch_size=batch_size)
     valloader = data.DataLoader(data.TensorDataset(X_val, y_val), shuffle=True, batch_size=batch_size)
         
-    ## Calling model class instance and training function
-    model_choice = input('Select a LSTM model to train (LSTM-FC,LSTM-ED,GRU-FC): ')
+    ## Selection of Neural net architecture and RNN unit type
+    net_choice = input('Select a network to train (GRU/LSTM): ')
+
+    arch_choice = input('Select the specific network architecture (FC/ED): ')
 
     # Creating a memory decorator from the factory
 
-    if model_choice == 'DMS':
-        # LSTM model instance
-        model = LSTM_DMS(input_size, hidden_size, output_size, pred_steps,
-                            l1_lambda=0.00, l2_lambda=1e-5)
-        
+    if arch_choice == 'FC':
+
+        if net_choice == 'LSTM':
+
+            model_choice = 'LSTM_FC'
+            # LSTM model instance
+            model = LSTM_FC(input_size, hidden_size, output_size, pred_steps,
+                                l1_lambda=0.00, l2_lambda=1e-5)
+        elif net_choice == 'GRU':
+
+            model_choice = 'GRU_FC'
+            # GRU model instance
+            model = GRU_FC(input_size, hidden_size, output_size, pred_steps,l1_lambda=0.00, l2_lambda=0)
+            
         optimizer = optim.Adam(model.parameters(), lr = learning_rate) # optimizer to estimate weights and biases (backpropagation)
             
         # Learning rate scheduler, set on min mode to decrease by factor when validation loss stops decreasing                                       
@@ -1119,29 +1158,36 @@ def main():
         
         #Decorating the training function with the memory profiler
         
-        train_DMS_dec = mem_profile(model=model_choice)(train_DMS)
+        train_FC_dec = mem_profile(model=model_choice)(train_FC)
 
-        train_DMS_dec(model, optimizer, loss_fn, trainloader, valloader, scheduler, 
+        train_FC_dec(model_choice, model, optimizer, loss_fn, trainloader, valloader, scheduler, 
             num_epochs, check_epochs, X_train, y_train, X_val, 
-            y_val,saveas='DMS_out',batch_loss=False)
+            y_val,saveas=f'{model_choice}_out',batch_loss=False)
         
-    elif model_choice == 'S2S':
-        # LSTM model instance
-        model = LSTM_S2S(input_size, hidden_size, output_size, pred_steps,
+    elif arch_choice == 'ED':
+
+        if net_choice == 'LSTM':
+
+            model_choice = 'LSTM_ED'
+            # LSTM model instance
+            model = LSTM_ED(input_size, hidden_size, output_size, pred_steps,
                          l1_lambda=0.00, l2_lambda=0.00)
         
+        elif net_choice == 'GRU':
+            pass
+   
         optimizer = optim.Adam(model.parameters(), lr = learning_rate) # optimizer to estimate weights and biases (backpropagation)
         
         # Learning rate scheduler, set on min mode to decrease by factor when validation loss stops decreasing                                       
         scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=True)
         
         #Decorating the training function with the memory profiler
-        train_S2S_dec = mem_profile(model=model_choice)(train_S2S)
+        train_ED_dec = mem_profile(model=model_choice)(train_ED)
         
-        train_S2S_dec(model,optimizer, loss_fn, trainloader, valloader, scheduler, num_epochs, 
+        train_ED_dec(model_choice, model,optimizer, loss_fn, trainloader, valloader, scheduler, num_epochs, 
                   check_epochs,pred_steps,X_train,y_train, X_val, y_val,
                   tf_ratio, dynamic_tf, training_prediction= 'mixed',
-                  saveas='S2S_out',batch_loss=False)
+                  saveas=f'{model_choice}_out',batch_loss=False)
 
     else:
         raise ValueError('Model selected is not configured/does not exist. Double check input.')
