@@ -6,7 +6,7 @@
 #########################################################################################################################################################
 
 import modeltrain_LSTM as trn
-from modeltrain_LSTM import LSTM_S2S, LSTM_DMS
+from modeltrain_LSTM import LSTM_ED, LSTM_FC, GRU_FC
 from tools_modeltraining import custom_loss
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 import torch
@@ -80,10 +80,25 @@ def train_tune(config, model_choice, init, X_tens, y_tens, best_chkpt_path, tuni
     valloader = data.DataLoader(data.TensorDataset(X_tens[1], y_tens[1]), 
                                 shuffle=True, batch_size=config['batch_size'])
     
-    ## Calling model class instance and training function
-    if model_choice == "DMS":
+    arch_choice = model_choice.split('_')[-1]
 
-        model = LSTM_DMS(init["input_size"],config['hidden_size'],
+    net_choice = model_choice.split('_')[0]
+    
+    ## Calling model class instance and training function based on user input selection
+
+    if arch_choice == 'FC':
+
+        if net_choice == 'LSTM':
+
+            # LSTM model instance
+            model = LSTM_FC(init["input_size"],config['hidden_size'],
+                         init["output_size"],init["pred_steps"],
+                         config["l1_lambda"], config["l2_lambda"])
+            
+        elif net_choice == 'GRU':
+
+            # GRU model instance
+            model = GRU_FC(init["input_size"],config['hidden_size'],
                          init["output_size"],init["pred_steps"],
                          config["l1_lambda"], config["l2_lambda"])
         
@@ -98,16 +113,22 @@ def train_tune(config, model_choice, init, X_tens, y_tens, best_chkpt_path, tuni
                 optimizer.load_state_dict(loaded_checkpoint_state['optimizer_state_dict'])
 
         ## Calling training function
-        trn.train_DMS(model, optimizer, loss_fn, trainloader, valloader, scheduler, 
+        trn.train_FC(model_choice, model, optimizer, loss_fn, trainloader, valloader, scheduler, 
             init["num_epochs"], init["check_epochs"], X_tens[0], y_tens[0], X_tens[1], 
-            y_tens[1],saveas='DMS_out',batch_loss=config["batch_loss"],tuning=tuning)
+            y_tens[1],saveas=f'{model_choice}_out',batch_loss=config["batch_loss"],tuning=tuning)
         
 
-    elif model_choice == 'S2S':
+    elif arch_choice == 'ED':
 
-        model = LSTM_S2S(init["input_size"],config['hidden_size'],
+        if net_choice == 'LSTM':
+
+            # LSTM model instance
+            model = LSTM_ED(init["input_size"],config['hidden_size'],
                          init["output_size"],init["pred_steps"],
                          config["l1_lambda"], config["l2_lambda"])
+        
+        elif net_choice == 'GRU':
+            pass
         
         optimizer = optim.Adam(model.parameters(), lr = config["learning_rate"])
         scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=True)
@@ -119,10 +140,10 @@ def train_tune(config, model_choice, init, X_tens, y_tens, best_chkpt_path, tuni
                 model.load_state_dict(loaded_checkpoint_state['model_state_dict'])
                 optimizer.load_state_dict(loaded_checkpoint_state['optimizer_state_dict'])
                 
-        trn.train_S2S(model,optimizer, loss_fn, trainloader, valloader, scheduler, init["num_epochs"], 
+        trn.train_ED(model_choice, model,optimizer, loss_fn, trainloader, valloader, scheduler, init["num_epochs"], 
                   init["check_epochs"],init["pred_steps"],X_tens[0], y_tens[0], X_tens[1], y_tens[1],
                   config["tf_ratio"], config["dynamic_tf"], config["training_prediction"],
-                  saveas='S2S_out',batch_loss=config["batch_loss"],tuning=tuning)
+                  saveas=f'{model_choice}_out',batch_loss=config["batch_loss"],tuning=tuning)
 
     else:
         raise ValueError('Model selected is not configured/does not exist. Double check input.')
@@ -203,7 +224,7 @@ def further_train(model_choice, init_training, X_tens, y_tens, best_trial,best_c
 
     best_chkpt_path = best_chkpt.path
     
-    ## save hyperparameters used forfurther  model trained for later plotting and rollout prediction
+    ## save hyperparameters used for further model trained for later plotting and rollout prediction
     hyperparams = {
         "input_size": init_training['input_size'],
         "hidden_size": config_training['hidden_size'],
@@ -216,7 +237,9 @@ def further_train(model_choice, init_training, X_tens, y_tens, best_trial,best_c
         "steps_in": init_training['steps_in'],
         "steps_out": init_training['steps_out'],
         "tf_ratio": config_training['tf_ratio'],
-        "dynamic_tf": config_training['dynamic_tf']
+        "dynamic_tf": config_training['dynamic_tf'],
+        "l1" : config_training['l1_lambda'],
+        "l2" : config_training['l2_lambda']
     }
 
     with open(os.path.join(trainedmod_savepath,f'hyperparams_{model_choice}.txt'), "w") as file:
@@ -237,7 +260,12 @@ def main():
     start_time = time.time()
     tracemalloc.start()
     
-    model_choice = input('Select a LSTM model to tune (DMS, S2S): ')
+    ## Selection of Neural net architecture and RNN unit type
+    net_choice = input('Select a network to use for predictions (GRU/LSTM): ')
+
+    arch_choice = input('Select the specific network architecture (FC/ED): ')
+
+    model_choice = net_choice + '_' + arch_choice
     
     ## Load windowed tensors for training and val
     X_tens, y_tens, _, _ ,_, _ = load_data(model_choice)
@@ -249,7 +277,7 @@ def main():
 
     #configure the hyperparameter search spaces for each model to tune
     search_spaces = {
-        'DMS': {
+        'FC': {
             'hidden_size': tune.choice([2 ** i for i in range(6, 9)]),
             'learning_rate': tune.choice([0.002,0.005,0.01]),
             'batch_size': tune.choice(range(8, 44, 4)),
@@ -261,7 +289,7 @@ def main():
             'batch_loss': tune.choice(['False']),
             'penalty_weight': tune.choice([0.01,0.1,1,10])
         },
-        'S2S': {
+        'ED': {
             'hidden_size': tune.choice([2 ** i for i in range(6, 9)]),
             'learning_rate': tune.choice([0.002,0.005]),
             'batch_size': tune.choice(range(8, 44, 4)),
@@ -275,7 +303,7 @@ def main():
         }
     }
 
-    search_space = search_spaces[model_choice]
+    search_space = search_spaces[arch_choice]
     
     # Set constant parameters to intialize the LSTM
     init = {
@@ -297,7 +325,7 @@ def main():
 
     ray.shutdown()
     ray.init(num_cpus=num_cpus_to_allocate)
-    num_samples = 10
+    num_samples = 6
     log_file_path = os.path.join(tuningmod_savepath,model_choice,f'logs/{model_choice}_tune_out.log')
 
     #Decorate the tuner

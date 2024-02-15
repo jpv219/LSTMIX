@@ -674,7 +674,9 @@ def saving_data(wd,hp,model_choice,save_hp=True):
             "steps_in": hp.steps_in,
             "steps_out": hp.steps_out,
             "tf_ratio": hp.tf_ratio,
-            "dynamic_tf": hp.dynamic_tf
+            "dynamic_tf": hp.dynamic_tf,
+            "l1": hp.l1,
+            "l2": hp.l2
         }
 
         with open(os.path.join(trainedmod_savepath,f'hyperparams_{model_choice}.txt'), "w") as file:
@@ -1124,6 +1126,10 @@ def main():
     tf_ratio = 0.4
     dynamic_tf = True
 
+    # Regularization l1,l2
+    l1 = 0
+    l2 = 0
+
     # customize loss function 
     penalty_weight = 0.1
     loss_fn = custom_loss(penalty_weight)
@@ -1135,8 +1141,7 @@ def main():
 
     arch_choice = input('Select the specific network architecture (FC/ED): ')
 
-    # Creating a memory decorator from the factory
-
+    # Selecting the model class to use based on user input
     if arch_choice == 'FC':
 
         if net_choice == 'LSTM':
@@ -1144,12 +1149,12 @@ def main():
             model_choice = 'LSTM_FC'
             # LSTM model instance
             model = LSTM_FC(input_size, hidden_size, output_size, pred_steps,
-                                l1_lambda=0.00, l2_lambda=1e-5)
+                                l1_lambda=l1, l2_lambda=l2)
         elif net_choice == 'GRU':
 
             model_choice = 'GRU_FC'
             # GRU model instance
-            model = GRU_FC(input_size, hidden_size, output_size, pred_steps,l1_lambda=0.00, l2_lambda=0)
+            model = GRU_FC(input_size, hidden_size, output_size, pred_steps,l1_lambda=l1, l2_lambda=l2)
             
         optimizer = optim.Adam(model.parameters(), lr = learning_rate) # optimizer to estimate weights and biases (backpropagation)
             
@@ -1171,7 +1176,7 @@ def main():
             model_choice = 'LSTM_ED'
             # LSTM model instance
             model = LSTM_ED(input_size, hidden_size, output_size, pred_steps,
-                         l1_lambda=0.00, l2_lambda=0.00)
+                         l1_lambda=l1, l2_lambda=l2)
         
         elif net_choice == 'GRU':
             pass
@@ -1198,13 +1203,13 @@ def main():
     HyperParams = namedtuple('HyperParams', [
     'input_size', 'hidden_size', 'output_size',
     'pred_steps', 'batch_size', 'learning_rate',
-    'num_epochs', 'check_epochs', 'steps_in', 'steps_out', 'tf_ratio', 'dynamic_tf'
+    'num_epochs', 'check_epochs', 'steps_in', 'steps_out', 'tf_ratio', 'dynamic_tf','l1','l2'
         ])
     
     hyper_params = HyperParams(input_size=input_size, hidden_size=hidden_size, output_size=output_size,
     pred_steps=pred_steps, batch_size=batch_size, learning_rate=learning_rate, num_epochs=num_epochs,
-    check_epochs=check_epochs, steps_in=steps_in, steps_out=steps_out, tf_ratio=tf_ratio, dynamic_tf=dynamic_tf
-    )
+    check_epochs=check_epochs, steps_in=steps_in, steps_out=steps_out, tf_ratio=tf_ratio, dynamic_tf=dynamic_tf, 
+    l1=l1, l2=l2)
 
     saving_data(windowed_data,hyper_params,model_choice)
 

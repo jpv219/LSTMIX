@@ -7,3 +7,4 @@ __pycache__/
 .DS_Store
 *.txt
 *.png
+*_fy*

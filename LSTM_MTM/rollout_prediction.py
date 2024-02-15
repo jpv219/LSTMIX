@@ -729,15 +729,15 @@ def main():
     if model_choice == 'LSTM_FC':
         model = LSTM_FC(hyperparams["input_size"], hyperparams["hidden_size"],
                          hyperparams["output_size"], hyperparams["pred_steps"],
-                            l1_lambda=0.00, l2_lambda=0.00)
+                            l1_lambda=hyperparams["l1"], l2_lambda=hyperparams["l2"])
     elif model_choice == 'LSTM_ED':
         model = LSTM_ED(hyperparams["input_size"], hyperparams["hidden_size"],
                          hyperparams["output_size"],hyperparams["pred_steps"],
-                         l1_lambda=0.00, l2_lambda=0.00)
+                         l1_lambda=hyperparams["l1"], l2_lambda=hyperparams["l2"])
     elif model_choice == 'GRU_FC':
         model = GRU_FC(hyperparams["input_size"], hyperparams["hidden_size"],
                          hyperparams["output_size"], hyperparams["pred_steps"],
-                            l1_lambda=0.00, l2_lambda=0.00)
+                            l1_lambda=hyperparams["l1"], l2_lambda=hyperparams["l2"])
 
 
     ## Load the last best model before training degrades         

@@ -10,7 +10,7 @@ import pickle
 import torch
 import matplotlib.pyplot as plt
 import seaborn as sns
-from modeltrain_LSTM import LSTM_DMS, LSTM_S2S
+from modeltrain_LSTM import LSTM_FC, LSTM_ED, GRU_FC
 from rollout_prediction import rollout
 import numpy as np
 from sklearn.metrics import r2_score
@@ -134,7 +134,7 @@ def plot_ensem_pred(model_name,features,scale,c_idx, case_label,
 
         legend = plt.legend(ncol=2)
         legend.set_title(f'Perturbation scale:{scale:.2f}, $R^2$:{r2:.4f}, Case: {plot_label}')
-        plt.title(f'Rollout pred with LSTM {model_name} for: {features[f_idx]}')
+        plt.title(f'Rollout pred with {model_name} for: {features[f_idx]}')
         plt.xlabel('Time steps')
         plt.ylabel(f'Scaled {features[f_idx]}')
         plt.xlim([0,110])
@@ -175,7 +175,7 @@ def plot_ensem_uncertainty(model_name,features,scale,c_idx, case_label,
         
         legend = plt.legend(ncol=2)
         legend.set_title(f'Perturbation scale:{scale:.2f} for test case {plot_label}')
-        plt.title(f'Uncertainty estimation of LSTM {model_name} for: {features[f_idx]}')
+        plt.title(f'Uncertainty estimation of {model_name} for: {features[f_idx]}')
         plt.xlabel('Time steps')
         plt.ylabel(f'Scaled {features[f_idx]}')
         plt.xlim([0,110])
@@ -190,8 +190,13 @@ def main():
     
     features = ['Number of drops', 'Interfacial Area']
 
-    ## Select LSTM model trained to use for predictions and plots
-    model_choice = input('Select a LSTM model to use for perturbation analysis (DMS, S2S): ')
+
+    ## Selection of Neural net architecture and RNN unit type
+    net_choice = input('Select a network to use for predictions (GRU/LSTM): ')
+
+    arch_choice = input('Select the specific network architecture (FC/ED): ')
+
+    model_choice = net_choice + '_' + arch_choice
 
     ##### LOADING MODEL, HYPERPARAMS AND DATA ######
     
@@ -233,13 +238,18 @@ def main():
     num_pertb = 50 # number of perturbed sequences to generate
     pertb_scales = [0.2] # Perturbation scaling factor
 
-    if model_choice == 'DMS':
-        model = LSTM_DMS(hyperparams["input_size"], hyperparams["hidden_size"],
+    if model_choice == 'LSTM_FC':
+        model = LSTM_FC(hyperparams["input_size"], hyperparams["hidden_size"],
                          hyperparams["output_size"], hyperparams["pred_steps"],
-                            l1_lambda=0.00, l2_lambda=0.00)
-    elif model_choice == 'S2S':
-        model = LSTM_S2S(hyperparams["input_size"], hyperparams["hidden_size"],
-                         hyperparams["output_size"],hyperparams["pred_steps"])
+                            l1_lambda=hyperparams["l1"], l2_lambda=hyperparams["l2"])
+    elif model_choice == 'LSTM_ED':
+        model = LSTM_ED(hyperparams["input_size"], hyperparams["hidden_size"],
+                         hyperparams["output_size"],hyperparams["pred_steps"], 
+                         l1_lambda=hyperparams["l1"], l2_lambda=hyperparams["l2"])
+    elif model_choice == 'GRU_FC':
+        model = GRU_FC(hyperparams["input_size"], hyperparams["hidden_size"],
+                         hyperparams["output_size"], hyperparams["pred_steps"],
+                            l1_lambda=hyperparams["l1"], l2_lambda=hyperparams["l2"])
 
 
     ## Load the last saved best model         
