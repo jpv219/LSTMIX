@@ -23,6 +23,7 @@ import time
 import tracemalloc
 from memory_profiler import profile
 from functools import wraps
+import configparser
 
 import ray
 from ray import tune
@@ -32,20 +33,15 @@ import ray.cloudpickle as raypickle
 
 ## Env. variables ##
 
-#fig_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/figs/'
-#input_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/input_data/'
-#trainedmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/trained_models/'
-#tuning_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/tuning'
+## Setting up paths globally
 
-fig_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/figs/'
-input_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/input_data/'
-trainedmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/trained_models/'
-tuningmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/tuning/'
+config_paths = configparser.ConfigParser()
+config_paths.read(os.path.join(os.getcwd(),'config/config_paths.ini'))
 
-#fig_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/figs/'
-#input_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX//LSTM_MTM/input_data/'
-#trainedmod_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/trained_models'
-#tuningmod_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/tuning/'
+fig_savepath = config_paths['Path']['figures']
+input_savepath = config_paths['Path']['input_data']
+trainedmod_savepath = config_paths['Path']['training']
+tuningmod_savepath = config_paths['Path']['tuning']
 
 ##################################### DECORATORS #################################################
 

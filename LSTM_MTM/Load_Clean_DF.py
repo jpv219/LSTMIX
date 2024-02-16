@@ -2,11 +2,16 @@
 import pandas as pd
 import Clean_CSV
 import os
+import configparser
 
-#global_dir = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/RawData'
-# global_dir = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/RawData'
-global_dir = '/home/jpv219/Documents/ML/LSTM_SMX/RawData/'
-#global_dir = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/RawData'
+## Env. variables ##
+
+## Setting up paths globally
+
+config_paths = configparser.ConfigParser()
+config_paths.read(os.path.join(os.getcwd(),'config/config_paths.ini'))
+
+global_dir = config_paths['Path']['raw_data']
 
 ### Generate dataframe with Gamma and drop volume values
 def extract_GVol(elem):

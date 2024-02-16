@@ -21,19 +21,18 @@ import time
 import tracemalloc
 from memory_profiler import profile
 import sys
+import configparser
 
 ## Env. variables ##
 
-#fig_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/figs/'
-#trainedmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/trained_models/'
+## Setting up paths globally
 
-#input_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX//LSTM_MTM/input_data/'
-#fig_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/figs/'
-#trainedmod_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/trained_models/'
+config_paths = configparser.ConfigParser()
+config_paths.read(os.path.join(os.getcwd(),'config/config_paths.ini'))
 
-input_savepath = '/home/jpv219/Documents/ML/LSTM_SMX//LSTM_MTM/input_data/'
-fig_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/figs/'
-trainedmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/trained_models/'
+fig_savepath = config_paths['Path']['figures']
+input_savepath = config_paths['Path']['input_data']
+trainedmod_savepath = config_paths['Path']['training']
 
 ## Plot setup
 

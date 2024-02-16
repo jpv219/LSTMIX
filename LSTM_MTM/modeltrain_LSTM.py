@@ -38,21 +38,16 @@ import ray.cloudpickle as raypickle
 
 ## Env. variables ##
 
-#fig_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/figs/'
-#input_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/input_data/'
-#trainedmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/trained_models/'
-#tuningmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/tuning/'
+## Setting up paths globally
 
-#fig_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/figs/'
-#input_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX//LSTM_MTM/input_data/'
-#trainedmod_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/trained_models'
-#tuningmod_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/tuning/'
+config_paths = configparser.ConfigParser()
+config_paths.read(os.path.join(os.getcwd(),'config/config_paths.ini'))
 
-fig_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/figs/'
-input_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/input_data/'
-trainedmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/trained_models/'
-tuningmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/tuning/'
-raw_datapath = '/home/jpv219/Documents/ML/LSTM_SMX/RawData'
+fig_savepath = config_paths['Path']['figures']
+input_savepath = config_paths['Path']['input_data']
+trainedmod_savepath = config_paths['Path']['training']
+tuningmod_savepath = config_paths['Path']['tuning']
+raw_datapath = config_paths['Path']['raw_data']
 
 ## Plot setup
 
@@ -1173,7 +1168,7 @@ def main():
     # Read the case-specific info from config file
     mixer_choice = input('Choose the mixing system you would like to pre-process (sm/sv): ')
     config = configparser.ConfigParser()
-    config.read(os.path.join(raw_datapath,f'config_{mixer_choice}.ini'))
+    config.read(os.path.join(os.getcwd(),f'config/config_{mixer_choice}.ini'))
 
     ####### WINDOW DATA ########
 

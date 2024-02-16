@@ -16,12 +16,17 @@ import numpy as np
 from sklearn.metrics import r2_score
 from contextlib import redirect_stdout
 import io
+import configparser
 
-# fig_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/figs/'
-# trainedmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/trained_svmodels/'
+## Env. variables ##
 
-fig_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/figs/'
-trainedmod_savepath = '/home/jpv219/Documents/ML/LSTM_SMX/LSTM_MTM/trained_models/'
+## Setting up paths globally
+
+config_paths = configparser.ConfigParser()
+config_paths.read(os.path.join(os.getcwd(),'config/config_paths.ini'))
+
+fig_savepath = config_paths['Path']['figures']
+trainedmod_savepath = config_paths['Path']['training']
 
 ## Plot setup
 
