@@ -530,7 +530,7 @@ def setup_DSD(n_bins,leftmost,rightmost,cases,feature_map,DSD_columns,pre_dict):
 def main():
     
     # Read the case-specific info from config file
-    mixer_choice = input('Choose the mixing system you would like to pre-process (static/stirred): ')
+    mixer_choice = input('Choose the mixing system you would like to pre-process (sm/sv): ')
 
     config = configparser.ConfigParser()
     config.read(os.path.join(raw_datapath,f'config_{mixer_choice}.ini'))

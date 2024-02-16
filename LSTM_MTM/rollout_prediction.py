@@ -11,7 +11,7 @@ import torch
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import seaborn as sns
-from modeltrain_LSTM import LSTM_FC, LSTM_ED, GRU_FC
+from modeltrain_LSTM import LSTM_FC, LSTM_ED, GRU_FC, GRU_ED
 import numpy as np
 from sklearn.metrics import r2_score
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
@@ -736,6 +736,10 @@ def main():
                          l1_lambda=hyperparams["l1"], l2_lambda=hyperparams["l2"])
     elif model_choice == 'GRU_FC':
         model = GRU_FC(hyperparams["input_size"], hyperparams["hidden_size"],
+                         hyperparams["output_size"], hyperparams["pred_steps"],
+                            l1_lambda=hyperparams["l1"], l2_lambda=hyperparams["l2"])
+    elif model_choice == 'GRU_ED':
+        model = GRU_ED(hyperparams["input_size"], hyperparams["hidden_size"],
                          hyperparams["output_size"], hyperparams["pred_steps"],
                             l1_lambda=hyperparams["l1"], l2_lambda=hyperparams["l2"])
 

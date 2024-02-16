@@ -246,6 +246,8 @@ class Window_data():
         # number of windows is determined via Tfinal - steps out - steps in + 1
         return torch.tensor(X_array), torch.tensor(y_array), np.array(casebatch_lens)
 
+######################################### LSTM ##################################################
+
 class LSTM_FC(nn.Module):
     
     ## class constructor
@@ -432,6 +434,8 @@ class LSTM_ED(nn.Module):
         else:
             return 0
 
+############################################# GRU #################################################
+
 class GRU_FC(nn.Module):
 
     # Class constructor
@@ -490,6 +494,130 @@ class GRU_FC(nn.Module):
         else:
             return 0
         
+class GRU_encoder(nn.Module):
+
+    # Encoder feeds decoder GRU through the hidden states
+    def __init__(self,input_size,hidden_size, num_layers=1):
+        super(GRU_encoder,self).__init__()
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+
+        self.gru = nn.GRU(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, 
+                            batch_first=True)
+        
+    # Take the input sequences and output the hidden states for the GRU decoder section
+    def forward(self, encoder_input):
+        ''' 
+        return encoder_hidden_states: outputs the last time hidden state to be fed into the GRU decoder
+        
+        input shape: (batch_size, input steps/input window, input_size=num_features)
+        output shape: (input_size=num_features, hidden_size)
+        '''
+        _, h_n_encoder = self.gru(encoder_input) #ignoring output (hidden states) for all times and only saving the last timestep hidden state
+        
+        return h_n_encoder
+    
+class GRU_decoder(nn.Module):
+
+    ## Same constructor as DMS as now we are decoding the final LSTM cell through a linear layer to generate the final output 
+    def __init__(self, input_size, hidden_size, output_size, num_layers=1):
+        super(GRU_decoder, self).__init__()
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.output_size = output_size
+        self.num_layers = num_layers
+        
+        self.gru = nn.GRU(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, 
+                            batch_first=True)
+        
+        self.linear = nn.Linear(hidden_size, output_size)
+
+    def forward(self, decoder_input, encoded_state):
+        '''
+        return 
+        gru_output: returns decoded hidden states as output for all times 
+        
+        input shape: (batch_size, 1, input_size=num_features) the last time step
+        output shape: (batch_size, input_size=num_features)
+        '''
+
+        # GRU cell is initialized with the encoder hidden state
+                # Input tensor is unsqueezed to introduce an additional dimension in axis = 1 to perform GRU calculations normally for 1 step
+        lstm_output, _ = self.gru(decoder_input.unsqueeze(1), encoded_state) #Similar to FC, output is saved, representing all hidden states per timestep
+        
+        ## output tensor is squeezed, removing the aritificial time dimension in axis = 1, as it will be looped during prediction for each time and appended to a 3D tensor.
+        output = self.linear(lstm_output.squeeze(1))
+        
+        return output
+
+class GRU_ED(nn.Module):
+    ''' Double GRU Encoder-decoder architecture to make predictions '''
+
+    #Constructing the encoder decoder GRU architecture
+    def __init__(self, input_size, hidden_size, output_size, pred_steps,
+                 l1_lambda=0.0, l2_lambda=0.0):
+        super(GRU_ED,self).__init__()
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.output_size = output_size
+        self.pred_steps = pred_steps #steps out = output window
+
+        # Relevance markers for L1 and L2 regularizations
+        self.l1_lambda = l1_lambda
+        self.l2_lambda = l2_lambda
+        
+        self.encoder = GRU_encoder(input_size=input_size, hidden_size=hidden_size)
+        self.decoder = GRU_decoder(input_size=input_size, hidden_size=hidden_size, output_size=output_size)
+
+    def forward(self,input_tensor):
+        '''
+        input_tensor: shape (batch_size, input steps = input window, input_size=num_features)
+        pred_steps: number of time steps to predict
+        return np_outputs: array containing predictions
+        '''
+                
+        # encode input_tensor
+        encoded_state = self.encoder(input_tensor)
+
+        # initialize output tensor for prediction
+        outputs = torch.zeros(input_tensor.shape[0], self.pred_steps, input_tensor.shape[2]) #shape = batch_size, steps_out, num_features
+
+        # decode input_tensor, only uses the last timestep from the input sequence to then rely on its own output or new inputs
+        decoder_input = input_tensor[:,-1,:] # Taking last value in the window/sequence
+        decoder_input_states = encoded_state
+
+        # predictions carried out on the decoder for each time in the output window = steps_out
+        for t in range(self.pred_steps):
+            decoder_output = self.decoder(decoder_input,decoder_input_states)
+            outputs[:,t,:] = decoder_output
+            # prediction done recursively, updating output as new input
+            decoder_input = decoder_output
+
+        np_outputs = outputs.detach().numpy() ## detaching from gradient requirements during prediction
+
+        return torch.from_numpy(np_outputs)
+    
+    ### Regularization functions to prevent overfitting
+    #L1 (lasso) encourages sparse weights
+    def l1_regularization_loss(self):
+        if self.training:
+            l1_loss = 0.0
+            for param in self.parameters():
+                l1_loss += torch.sum(torch.abs(param))
+            return self.l1_lambda * l1_loss
+        else:
+            return 0
+
+    #L2 (Ridge) encourages small weights
+    def l2_regularization_loss(self):
+        if self.training:
+            l2_loss = 0.0
+            for param in self.parameters():
+                l2_loss += torch.sum(param ** 2)
+            return 0.5 * self.l2_lambda * l2_loss
+        else:
+            return 0
 
 ##################################### DECORATORS #################################################
 
@@ -1043,7 +1171,7 @@ def main():
     tracemalloc.start()
     
     # Read the case-specific info from config file
-    mixer_choice = input('Choose the mixing system you would like to pre-process (static/stirred): ')
+    mixer_choice = input('Choose the mixing system you would like to pre-process (sm/sv): ')
     config = configparser.ConfigParser()
     config.read(os.path.join(raw_datapath,f'config_{mixer_choice}.ini'))
 
@@ -1150,8 +1278,12 @@ def main():
     
     else:
 
+        if not os.path.exists(hp_path):
+            print('No hyperparams.txt found, tuning must be executed first')
+
         print('Continuing with default hyperparams...')
-        # Define hyperparameters
+
+        # Define defaulthyperparameters
         input_size = X_train.shape[-1]  # Number of features in the input tensor
         hidden_size = 64  # Number of hidden units in the LSTM cell, determines how many weights will be used in the hidden state calculations
         output_size = y_train.shape[-1]  # Number of output features, same as input in this case
@@ -1210,7 +1342,9 @@ def main():
                          l1_lambda=l1, l2_lambda=l2)
         
         elif net_choice == 'GRU':
-            pass
+            
+            #GRU model instance
+            model = GRU_ED(input_size,hidden_size,output_size,pred_steps,l1,l2)
    
         optimizer = optim.Adam(model.parameters(), lr = learning_rate) # optimizer to estimate weights and biases (backpropagation)
         

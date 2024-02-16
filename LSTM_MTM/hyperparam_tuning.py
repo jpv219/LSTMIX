@@ -6,7 +6,7 @@
 #########################################################################################################################################################
 
 import modeltrain_LSTM as trn
-from modeltrain_LSTM import LSTM_ED, LSTM_FC, GRU_FC
+from modeltrain_LSTM import LSTM_ED, LSTM_FC, GRU_FC, GRU_ED
 from tools_modeltraining import custom_loss
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 import torch
@@ -128,7 +128,9 @@ def train_tune(config, model_choice, init, X_tens, y_tens, best_chkpt_path, tuni
                          config["l1_lambda"], config["l2_lambda"])
         
         elif net_choice == 'GRU':
-            pass
+            model = GRU_ED(init["input_size"],config['hidden_size'],
+                         init["output_size"],init["pred_steps"],
+                         config["l1_lambda"], config["l2_lambda"])
         
         optimizer = optim.Adam(model.parameters(), lr = config["learning_rate"])
         scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=True)
@@ -306,7 +308,7 @@ def main():
 
     search_space = search_spaces[arch_choice]
     
-    # Set constant parameters to intialize the LSTM
+    # Set constant parameters to intialize the RNN
     init = {
         "input_size": X_tens[0].shape[-1],
         "output_size": y_tens[0].shape[-1],

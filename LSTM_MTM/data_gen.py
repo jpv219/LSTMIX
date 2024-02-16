@@ -29,7 +29,7 @@ raw_datapath = '/home/jpv219/Documents/ML/LSTM_SMX/RawData/'
 def main():
     
     # Read the case-specific info from config file
-    mixer_choice = input('Choose the mixing system you would like to pre-process (static/stirred): ')
+    mixer_choice = input('Choose the mixing system you would like to pre-process (sm/sv): ')
     config = configparser.ConfigParser()
     config.read(os.path.join(raw_datapath,f'config_{mixer_choice}.ini'))
 
@@ -91,7 +91,7 @@ def main():
 
     windowed_data = trn.windowing(steps_in,steps_out,stride,train_frac, test_frac, input_df, Allcases,features,bin_edges)
 
-    model_choice = input('Which model would you like to generate data for? (LSTM_FC,LSTM_ED,GRU_FC): ')
+    model_choice = input('Which model would you like to generate data for? (LSTM_FC,LSTM_ED,GRU_FC,GRU_ED): ')
 
     trn.saving_data(windowed_data,hp={},model_choice=model_choice,save_hp=False)
 
