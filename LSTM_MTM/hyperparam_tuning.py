@@ -238,6 +238,7 @@ def further_train(model_choice, init_training, X_tens, y_tens, best_trial,best_c
         "steps_out": init_training['steps_out'],
         "tf_ratio": config_training['tf_ratio'],
         "dynamic_tf": config_training['dynamic_tf'],
+        "penalty_weight": config_training['penalty_weight'],
         "l1" : config_training['l1_lambda'],
         "l2" : config_training['l2_lambda']
     }

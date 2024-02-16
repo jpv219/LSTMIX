@@ -675,6 +675,7 @@ def saving_data(wd,hp,model_choice,save_hp=True):
             "steps_out": hp.steps_out,
             "tf_ratio": hp.tf_ratio,
             "dynamic_tf": hp.dynamic_tf,
+            "penalty_weight": hp.penalty_weight,
             "l1": hp.l1,
             "l2": hp.l2
         }
@@ -1113,46 +1114,77 @@ def main():
 
     ######### LSTM MODEL TRAINING ##########
 
-    # Define hyperparameters
-    input_size = X_train.shape[-1]  # Number of features in the input tensor
-    hidden_size = 64  # Number of hidden units in the LSTM cell, determines how many weights will be used in the hidden state calculations
-    output_size = y_train.shape[-1]  # Number of output features, same as input in this case
-    pred_steps = steps_out # Number of future steps to predict
-    batch_size = 36 # How many windows are being processed per pass through the LSTM
-    learning_rate = 0.01
-    num_epochs = 3000
-    check_epochs = 100
-
-    tf_ratio = 0.4
-    dynamic_tf = True
-
-    # Regularization l1,l2
-    l1 = 0
-    l2 = 0
-
-    # customize loss function 
-    penalty_weight = 0.1
-    loss_fn = custom_loss(penalty_weight)
-    trainloader = data.DataLoader(data.TensorDataset(X_train, y_train), shuffle=True, batch_size=batch_size)
-    valloader = data.DataLoader(data.TensorDataset(X_val, y_val), shuffle=True, batch_size=batch_size)
-        
     ## Selection of Neural net architecture and RNN unit type
     net_choice = input('Select a network to train (GRU/LSTM): ')
 
     arch_choice = input('Select the specific network architecture (FC/ED): ')
 
+    model_choice = net_choice + '_' + arch_choice
+
+    # Replacing default hyperparameters with txt file obtained from tuning
+    hyper_choice = input('Use tuning hyperparameters if available? (y/n): ')
+
+    hp_path = os.path.join(trainedmod_savepath,f'hyperparams_{model_choice}.txt')
+
+    if hyper_choice.lower() == 'y' and os.path.exists(hp_path):
+
+        hyperparams = {}
+
+        #Reading hyperparams from txt file saved during tuning procedure
+        with open(hp_path) as file:
+            for line in file:
+                key, value = line.strip().split(": ")  # Split each line into key and value
+                hyperparams[key] = eval(value)
+
+        input_size = hyperparams['input_size']
+        hidden_size = hyperparams['hidden_size']
+        output_size = hyperparams['output_size']
+        pred_steps = hyperparams['pred_steps']
+        batch_size = hyperparams['batch_size']
+        learning_rate = hyperparams['learning_rate']
+        tf_ratio = hyperparams['tf_ratio']
+        dynamic_tf = hyperparams['dynamic_tf']
+        l1 = hyperparams['l1']
+        l2 = hyperparams['l2']
+        penalty_weight = hyperparams['penalty_weight']
+    
+    else:
+
+        print('Continuing with default hyperparams...')
+        # Define hyperparameters
+        input_size = X_train.shape[-1]  # Number of features in the input tensor
+        hidden_size = 64  # Number of hidden units in the LSTM cell, determines how many weights will be used in the hidden state calculations
+        output_size = y_train.shape[-1]  # Number of output features, same as input in this case
+        pred_steps = steps_out # Number of future steps to predict
+        batch_size = 36 # How many windows are being processed per pass through the LSTM
+        learning_rate = 0.01
+        penalty_weight = 0.1
+
+        tf_ratio = 0.4
+        dynamic_tf = True
+
+        # Regularization l1,l2
+        l1 = 0
+        l2 = 0
+
+    num_epochs = 3000
+    check_epochs = 100
+
+    # customize loss function 
+    loss_fn = custom_loss(penalty_weight)
+    trainloader = data.DataLoader(data.TensorDataset(X_train, y_train), shuffle=True, batch_size=batch_size)
+    valloader = data.DataLoader(data.TensorDataset(X_val, y_val), shuffle=True, batch_size=batch_size)
+        
     # Selecting the model class to use based on user input
     if arch_choice == 'FC':
 
         if net_choice == 'LSTM':
 
-            model_choice = 'LSTM_FC'
             # LSTM model instance
             model = LSTM_FC(input_size, hidden_size, output_size, pred_steps,
                                 l1_lambda=l1, l2_lambda=l2)
         elif net_choice == 'GRU':
 
-            model_choice = 'GRU_FC'
             # GRU model instance
             model = GRU_FC(input_size, hidden_size, output_size, pred_steps,l1_lambda=l1, l2_lambda=l2)
             
@@ -1173,7 +1205,6 @@ def main():
 
         if net_choice == 'LSTM':
 
-            model_choice = 'LSTM_ED'
             # LSTM model instance
             model = LSTM_ED(input_size, hidden_size, output_size, pred_steps,
                          l1_lambda=l1, l2_lambda=l2)
@@ -1203,13 +1234,13 @@ def main():
     HyperParams = namedtuple('HyperParams', [
     'input_size', 'hidden_size', 'output_size',
     'pred_steps', 'batch_size', 'learning_rate',
-    'num_epochs', 'check_epochs', 'steps_in', 'steps_out', 'tf_ratio', 'dynamic_tf','l1','l2'
+    'num_epochs', 'check_epochs', 'steps_in', 'steps_out', 'tf_ratio', 'dynamic_tf','penalty_weight','l1','l2'
         ])
     
     hyper_params = HyperParams(input_size=input_size, hidden_size=hidden_size, output_size=output_size,
     pred_steps=pred_steps, batch_size=batch_size, learning_rate=learning_rate, num_epochs=num_epochs,
     check_epochs=check_epochs, steps_in=steps_in, steps_out=steps_out, tf_ratio=tf_ratio, dynamic_tf=dynamic_tf, 
-    l1=l1, l2=l2)
+    penalty_weight=penalty_weight,l1=l1, l2=l2)
 
     saving_data(windowed_data,hyper_params,model_choice)
 
