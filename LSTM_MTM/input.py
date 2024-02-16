@@ -1,5 +1,5 @@
 ### LSTM pre-processing input data
-### Author: Juan Pablo Valdes
+### Author: Juan Pablo Valdes and Fuyue Liang
 ### First commit: Oct, 2023
 ### Department of Chemical Engineering, Imperial College London
 #########################################################################################################################################################
@@ -8,7 +8,6 @@
 import numpy as np
 import pandas as pd
 import Load_Clean_DF
-import inputDSD as dsd
 from sklearn.preprocessing import MinMaxScaler
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -17,11 +16,23 @@ from statsmodels.nonparametric.smoothers_lowess import lowess
 import os
 import pickle
 import random
+import math
+import copy
+# For input preprocessing methods for different mixers
+import configparser
 import ast
 
 ## Env. variables ##
-fig_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/figs/'
-input_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/input_data/'
+
+## Setting up paths globally
+
+config_paths = configparser.ConfigParser()
+config_paths.read(os.path.join(os.getcwd(),'config/config_paths.ini'))
+
+fig_savepath = config_paths['Path']['figures']
+input_savepath = config_paths['Path']['input_data']
+trainedmod_savepath = config_paths['Path']['training']
+raw_datapath = config_paths['Path']['raw_data']
 
 ## Plot setup
 
@@ -49,300 +60,561 @@ fine_labels = {
     # smx cases #
     'b03': r'$\beta=0.3$','b06':r'$\beta=0.6$','bi001':r'$Bi=0.01$','bi01':r'$Bi=0.1$','da01': r'$Da=0.1$','da1':r'$Da=1$',
     'b06pm':r'$\beta_{pm}=0.6$,','b09pm':r'$\beta_{pm}=0.9$,','bi001pm':r'$Bi_{pm}=0.01$,',
-    'bi1':r'$Bi=1$','bi01pm':r'$Bi=0.1$,','3drop':r'3-Drop',
-    'b09':r'$\beta=0.9$','da01pm':r'$Da_{pm}=0.1$, ','da001':r'$Da=0.01$', 'coarsepm':r'Pre-Mix'
+    'bi1':r'$Bi=1$','bi01pm':r'$Bi_{pm}=0.1$,','3d':r'3-Drop',
+    'b09':r'$\beta=0.9$','da01pm':r'$Da_{pm}=0.1$, ','da001':r'$Da=0.01$', 'PM':r'Coarse Pre-Mix', 'FPM' : r'Fine Pre-Mix',
+    'alt1': r'Alt1', 'alt2': r'Alt2', 'alt3': r'Alt3', 'alt4': r'Alt4', 'alt1_b09': r'$\beta_{alt1 pm}=0.9$', 'alt4_b09':  r'$\beta_{alt4 pm}=0.9$',
+    'alt4_f': r'Alt4 Fine PM', 'b03a': r'$\beta_{alt4}=0.3$', 'b06a': r'$\beta_{alt4}=0.6$', 'b09a': r'$\beta_{alt4}=0.9$',
+    'bi1a': r'$Bi_{alt4}=1$', 'bi01a': r'$Bi_{alt4}=0.1$', 'bi001a': r'$Bi_{alt4}=0.01$'
 }
 
+##### CLASSES #####
 
-##### METHODS #####
+class RawData_processing():
 
-def import_rawdata(case):
-    if case == '3drop' or case == 'coarsepm':
-        # If true, extract only volume array
-        df_Vol = Load_Clean_DF.extract_Vol(case)
-    else:
-        # If false, extract volume and concentration arrays
-        df_Vol = Load_Clean_DF.extract_GVol(case)
-    
-    # Extract number of drops (Nd) and interfacial area (IntA)
-    Nd = Load_Clean_DF.extract_Nd(case)
-    IntA = Load_Clean_DF.extract_IA(case)
-
-    return df_Vol, Nd, IntA
-
-def import_svrawdata(case, opt, initial=320, stop=704):
-    '''
-    return a dataframe with columns ['Time', 'DropVolume', 'Gammatilde', 'DropNum', 'IntArea']
-    '''
-    
-    data_dir = '/home/fl18/Desktop/automatework/RNN_auto/APSdata/'
-    df = pd.read_csv(str(data_dir)+str(case)+'.csv')
-    print(f'------------{case}---------')
-    # surfactant-laden cases to count the drop numbers from list drop volume
-    if 'clean' in case:
-        df['DropVolume'] = df['DropVolume'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
-        df['DropNum'] = df['DropVolume'].apply(lambda x: len(x))
-    
-    else:
-        df['DropVolume'] = df['DropVolume'].str.replace(' ',', ')
-        df['Gammatilde'] = df['Gammatilde'].apply(lambda x: ', '.join(x.split())) # standardize the separator
-        df['DropVolume'] = df['DropVolume'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
-        df['Gammatilde'] = df['Gammatilde'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
-        df['DropNum'] = df['DropVolume'].apply(lambda x: len(x))
-    
-    # Truncation of data
-    truned_df = df.loc[(round(df['Time']/opt) >= initial) & (round(df['Time']/opt) <= stop)]
-    print(f'opt:{opt}')
-    print(truned_df['Time'].min(), truned_df['Time'].max())
-    
-    # merge the data of interfacial area
-    ints_df = pd.read_csv(str(data_dir)+'IntArea_'+str(case)+'.csv')
-    data = pd.merge(truned_df, ints_df, on='Time', how='left')
-    print(len(data), pd.isna(data).any())
-    
-    return data
-
-## group input data into case-wise dictionary
-
-def sort_inputdata(cases):
-
-    # Initialize dicts to hold all data extracted from HR sims, before and after post-process
-    pre_dict = {}
-    post_dict = {}
-
-    # Loop through all cases
-    for case in cases:
-        # Extract raw data
-        # df_Vol, Nd, IntA = import_rawdata(case)
+    def __init__(self,cases) -> None:
+        self.cases = cases
         
-        # time = Nd['Time']
-        # n_drops = Nd['Ndrops']
-        # IA = IntA['IA']
-        # DSD = df_Vol['Volume']
-        if 'clean' in case:
-            f = int(case.split('_')[1][:-2])
-            data = import_svrawdata(case, opt=1/32/f)
+    ## load raw data per case from csv files
+    def import_rawdata(self,case):
+
+        file_name_gvol = os.path.join(raw_datapath,f"{case}_GVol.csv")
+        file_name_vol = os.path.join(raw_datapath,f"{case}_Vol.csv")
+
+    # Check if the files exist
+        if os.path.isfile(file_name_gvol):
+            # If true, extract volume and concentration arrays
+            df_Vol = Load_Clean_DF.extract_GVol(case)
+
+        elif os.path.isfile(file_name_vol):
+            # If false, extract only volume array
+            df_Vol = Load_Clean_DF.extract_Vol(case)
         else:
-            data = import_svrawdata(case, opt=0.00625)
+            # Handle the case where neither file exists
+            raise FileNotFoundError(f"Neither {file_name_gvol} nor {file_name_vol} found.")
         
-        time = data['Time']
-        n_drops = data['DropNum']
-        IA = data['IntArea']
-        DSD = data['DropVolume']
+        # Extract number of drops (Nd) and interfacial area (IntA)
+        IntA = pd.read_csv(os.path.join(raw_datapath,'IA',f'{case}_IA.csv'))
+        Nd = df_Vol['Volume'].apply(lambda x: len(x))
+        
 
-        # Determine if case needs surf. conc. or clean
-        if case == '3drop' or case == 'coarsepm' or 'clean' in case:
-            G = []  # If true, set G as an empty list
+        return df_Vol, Nd, IntA
+
+    ## group input data into case-wise dictionary
+    def sort_inputdata(self):
+
+        # Initialize dicts to hold all data extracted from HR sims, before and after post-process
+        pre_dict = {}
+        post_dict = {}
+
+        # Loop through all cases
+        for case in self.cases:
+            # Extract raw data
+            df_Vol, Nd, IntA = self.import_rawdata(case)
+            
+            time = IntA['Time']
+            n_drops = Nd
+            IA = IntA['IA']
+            DSD = df_Vol['Volume']
+
+            file_name_gvol = os.path.join(raw_datapath,f"{case}_GVol.csv")
+            file_name_vol = os.path.join(raw_datapath,f"{case}_Vol.csv")
+            
+            # Determine if case needs surf. conc. or clean
+            if os.path.isfile(file_name_vol):
+                G = []  # If true, set G as an empty list
+            elif os.path.isfile(file_name_gvol):
+                G = df_Vol['Gammatilde']  # If false, extract G data
+            
+            ## Dictionary holding a dictionary per case for all extracted data from paraview
+            pre_dict[case] = {'Time': time, 'Nd': n_drops, 'IA': IA, 'Vol': DSD, 'G': G}
+            
+            # Initialize an empty post-process dict per case
+            post_dict[case] = {}
+        
+        return pre_dict, post_dict
+
+class DSD_processing():
+
+    def __init__(self,cases,num_bins) -> None:
+        self.cases = cases
+        self.num_bins = num_bins
+
+    ## generate bins based on max/min volume sizes across all cases across all times
+    def gen_bins(self,pre_dict,closed:str):
+        
+        #Scaling ref values for drop volumes
+        l_cap = (0.035/(9.80665*(998-824)))**0.5
+        v_cap = (4/3) * math.pi * (l_cap/2)**3
+
+        max_list, min_list = [],[]
+
+        #loop for all cases in pre_dict
+        for case in self.cases:
+            pre_dict[case]['Vol'] = pre_dict[case]['Vol'].apply(
+                lambda x: np.log10(x/v_cap).astype('float32'))
+            
+            ## find max/min value in each volume array per time through lambda fun
+            max_val = pre_dict[case]['Vol'].apply(lambda x: np.max(x) if len(x) > 0 else 0) #list of max value for each time
+            min_val = pre_dict[case]['Vol'].apply(lambda x: np.min(x) if len(x) > 0 else 0)
+
+            # extracting max/min value for all times and appending per case
+            max_list.append(max(max_val))
+            min_list.append(min(min_val))
+        
+        ## bin range, max/min value for all cases
+        max_size = math.ceil(max(max_list))
+        min_size = math.floor(min(min_list))
+
+        ## generate bins
+        bins = pd.interval_range(start=min_size,
+                periods=self.num_bins,end=max_size,closed=closed)
+        
+        #bin edges
+        bin_edges = [interval.left for interval in bins]
+        bin_edges.append(bins[-1].right)
+
+        return pre_dict, bins, bin_edges
+    
+    def find_bin(self,value, bins):
+        """ bins is a list of tuples, e.g., [(0,20), (20, 40), (40, 60)],
+            binning returns the smallest index i of bins so that
+            bin[i][0] <= value < bin[i][1]
+        """
+        for i in range(0, len(bins)):
+
+            if value in bins[i]:
+                return i
+        return -1
+   
+    def sort_into_bins(self,pre_dict):
+        
+        pre_dict, bins, bin_edges = self.gen_bins(pre_dict,closed='left')
+        
+        # Loop through all case dicts
+        for case in self.cases:
+            # Initialize a dictionary for bin counts per timestep (size based on total times from len(predict))
+            bin_counts = {f'b{i}': [0] * len(pre_dict[case]['Vol']) for i in range(self.num_bins)}
+            
+            # Loop through volume arrays in each time j in each case
+            for j, d_vol_array in enumerate(pre_dict[case]['Vol']):
+
+                # Classify each drop volume into a given bin for timestep j
+                for drop in d_vol_array:
+                    bin_index = self.find_bin(drop, bins)
+                    bin_counts[f'b{bin_index}'][j] += 1 # store the bin count at each time j
+            
+            # Assign the counts to pre_dict[case]
+            for key, value in bin_counts.items():
+                pre_dict[case][key] = value
+
+        return pre_dict, bin_edges
+
+    def filter_bins(self,bin_edges, pre_dict, leftmost, rightmost):
+
+        ## Extract the bin_width
+        bin_width = np.diff(bin_edges[leftmost:rightmost+1])[-1]
+
+        for case in self.cases:
+            bins_kept = []
+            bins_to_delete = []
+
+            for key in pre_dict[case].keys():
+                ## targeting only keys corresponding to bins
+                if key.startswith('b'):
+                    bin_number = int(key[1:])  # Extract the number after 'b'
+
+                    ## deleting bins based on left/rightmost filters
+                    if bin_number < leftmost or bin_number > rightmost:
+                        bins_to_delete.append(key)
+                    ## Keep the rest of the bins
+                    else:
+                        bins_kept.append(key)
+
+            ## filter out bins
+            for key in bins_to_delete:
+                del pre_dict[case][key]
+        
+        return pre_dict,bin_width,bins_to_delete, bins_kept
+
+    def density_func_est(self,f_pre_dict, bin_width, bins_kept):
+        '''
+        Transform the drop counts into probabilities
+        Input: pre_dict containing dictionaries per case
+        leftmost: smallest bin number
+        rightmost: largest bin number
+        output: pre_dict with bins replaced for density fun estimates
+        '''
+
+        ## Carrying out density fun estimation per case for all bins
+        for case in self.cases:
+            prob_dens = []
+            norm_dens = []
+
+            i=0
+
+            for key in f_pre_dict[case].keys():
+
+                ## targeting only keys corresponding to bins
+                if key.startswith('b'):
+                    ## calculate prob density estimation per bin: prob_dens is a list containing bin arrays.
+                    prob_dens.append(np.where(f_pre_dict[case]['Nd']>0, f_pre_dict[case][key]/(f_pre_dict[case]['Nd']*bin_width),0))
+
+            ## Calculate cumulative density values for all bins per time: element-wise addition of all bins per time
+            cum_dens = np.zeros_like(prob_dens[0])
+            for arr in prob_dens:
+                cum_dens += arr
+
+            ## Go through each prob density bin array and normalize it
+            for j in range(len(prob_dens)):
+
+                arr = np.where(cum_dens>0, prob_dens[j] / cum_dens, 0)
+                norm_dens.append(arr)
+
+            for i, bin in enumerate(bins_kept):
+                ## re-write bin drop counts with norm density values
+                f_pre_dict[case][bin] = norm_dens[i]
+
+        return f_pre_dict
+
+class Post_processing():
+
+    def __init__(self,cases,norm_columns,feature_map,DSD_choice:str,DSD_columns) -> None:
+        self.cases = cases
+        self.norm_columns = norm_columns
+        self.DSD_columns = DSD_columns
+        self.feature_map = feature_map
+        self.DSD_choice = DSD_choice
+
+    ## Normalize input data
+    def scale_inputs(self,pre_dict,post_dict):
+                
+        for case in self.cases:
+            norm_data_case = pre_dict[case]
+
+            # Loop through each column to be normalized
+            for column in self.norm_columns:
+
+                mapped_column = self.feature_map.get(column)
+                norm_data = norm_data_case[mapped_column].values.astype('float64')
+                
+                # Reshape the data to be compatible with the scaler
+                norm_data = norm_data.reshape(-1, 1)
+                
+                # Create a MinMaxScaler and fit it to the data
+                scaler = MinMaxScaler(feature_range=(0, 1))
+                scaler = scaler.fit(norm_data)
+                
+                # Transform and store the normalized data in the post_data dict. Post dict only holds dictionary with input variables per case
+                post_dict[case][mapped_column] = scaler.transform(norm_data).astype('float32')
+            
+            ## if DSD is being processed, transfer bins into post_dict
+            if self.DSD_choice.lower() == 'y':
+
+                for col in self.DSD_columns:
+                    mapped_col = self.feature_map.get(col)
+                    post_dict[case][mapped_col] = norm_data_case[mapped_col].astype('float32')
+
+                
+        return post_dict
+
+    ## shape input to a suitable format for LSTM MTM architecture
+
+    def shape_inputdata(self,post_dict):
+
+        array = []
+        ## Extracting all keys to be processed from normalised features and filtered bins.
+        keys = [self.feature_map.get(feature) for feature in self.norm_columns+self.DSD_columns] 
+
+        ### All cases must have the same number of data points for them to be used in LSTM
+        min_length = min(len(data['IA']) for data in post_dict.values())
+
+        # Iterate through each case
+        for case in self.cases:
+            case_data = []
+            #Iterate per feature per case
+            for key in keys:
+                # Cases are truncated with the min length in order to be stacked as a nparray
+                data = post_dict[case][key][:min_length]
+                case_data.append(data)
+
+            # Combine all features per case into a single numpy array, with each feature as a column. shape: rows, col =  timesteps ,features
+            combined_data = np.column_stack(case_data)
+            
+            # Append each combined dataset (2D nparray) per case as an element in a list.
+            array.append(combined_data)
+
+        # Re-shape array list as a 3D nparray, appending each case horizontally = stacking each case as a column, each column with n features 
+        shaped_input = np.stack(array, axis=1)
+        print('(time_step, num_case, num_feature)=', shaped_input.shape)
+
+        return shaped_input
+
+    ## smoothing function for shaped data
+
+    def smoothing(self,in_data, method, window_size=None, poly_order=None, lowess_frac = None):
+        '''
+        Input array : array with shape times,cases,features, smoothing only features 1,2 (ND,IA)
+        Three methods to smooth:
+        
+        'moveavg': requires window_size
+        'savgol': requires window_size, poly_order
+        'lowess': requires lowess_frac
+        '''
+        # Create a copy of the input data to avoid modifying the original array
+        data = np.copy(in_data)
+        # Extract the features to be smoothed
+        smoothed_features = data[:, :, :2]
+        ## rolling window averaging method
+        if method == 'moveavg':
+            if window_size is None:
+                raise ValueError('Window size required')
+            smoothed_data = pd.DataFrame(smoothed_features).rolling(int(window_size), axis = 0).mean()
+            smoothed_data.fillna(pd.DataFrame(smoothed_features),inplace=True)
+        ## SavGol filter based on fitting least-squares polynomial to a window of data points
+        elif method == 'savgol':
+            if window_size is None or poly_order is None:
+                raise ValueError('Mising input arguments: Windowsize/polyorder')
+            smoothed_data = np.apply_along_axis(
+                        lambda col: savgol_filter(col, int(window_size), int(poly_order)),
+                        axis = 0, arr=smoothed_features)
+        ## Locally Weighted Scatterplot Smoothing, locally fitting linear regressions
+        elif method == 'lowess':
+            if lowess_frac is None:
+                raise ValueError('Lowess fraction required')
+            smoothed_data = np.apply_along_axis(
+                        lambda col: lowess(col,np.arange(len(col)),frac = float(lowess_frac),return_sorted=False),
+                        axis = 0, arr = smoothed_features)
         else:
-            G = data['Gammatilde']  # If false, extract G data
+            raise ValueError('Unsupported smoothing method')
         
-        ## Dictionary holding a dictionary per case for all extracted data from paraview
-        pre_dict[case] = {'Time': time, 'Nd': n_drops, 'IA': IA, 'Vol': DSD, 'G': G}
+        ## Locate range/interval of the smoothed columns
+        smoothed_columns = np.arange(smoothed_data.shape[-1])
+
+        # Reassign the smoothed columns to the original data
+        data[:, :, smoothed_columns] = smoothed_data
         
-        # Initialize an empty post-process dict per case
-        post_dict[case] = {}
-    
-    return pre_dict, post_dict
+        return data
 
-## Normalize input data
+    #### PLOTS ####
 
-def scale_inputs(cases,norm_columns):
-    
-    pre_dict, post_dict = sort_inputdata(cases)
+    def plot_inputdata(self,fine_labels, data,dpi=150):
+        ### looping over the number of features (Nd and IA)
 
-    feature_map = {'Number of drops': 'Nd',
-                   'Interfacial Area': 'IA'
-                   }
-    
-    for case in cases:
-        norm_data_case = pre_dict[case]
+        colors = sns.color_palette("husl", len(self.cases))
 
-        # Loop through each column to be normalized
-        for column in norm_columns:
+        # Create a single figure with multiple subplots
+        fig, axes = plt.subplots(1,2, figsize=(12, 8), dpi=dpi, num=1)
 
-            mapped_column = feature_map.get(column)
-            norm_data = norm_data_case[mapped_column].values.astype('float64')
-            
-            # Reshape the data to be compatible with the scaler
-            norm_data = norm_data.reshape(-1, 1)
-            
-            # Create a MinMaxScaler and fit it to the data
-            scaler = MinMaxScaler(feature_range=(0, 1))
-            scaler = scaler.fit(norm_data)
-            
-            # Transform and store the normalized data in the post_data dict. Post dict only holds dictionary with input variables per case
-            post_dict[case][mapped_column] = scaler.transform(norm_data).astype('float32')
-    
-    return post_dict
+        for i, ax in enumerate(axes):
+            ax.set_title(f'{self.norm_columns[i]}')
+            ax.set_xlabel('Time steps')
+            ax.set_ylabel(f'Scaled {self.norm_columns[i]}')
 
-## shape input to a suitable format for LSTM MTM architecture
+            for spine in ax.spines.values():
+                spine.set_linewidth(1.5)
 
-def shape_inputdata(post_dict):
+            for idx, case in enumerate(self.cases):
 
-    array = []
+                label = fine_labels.get(case,case)
+                ax.plot(data[:, idx, i], label=f'{label}', color=colors[idx % len(colors)])
+                ax.tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', length=5, width=1.5)
+                ax.grid(color='k', linestyle=':', linewidth=0.1)
 
-    ### All cases must have the same number of data points for them to be used in LSTM
-    min_length = min(len(data['IA']) for data in post_dict.values())
+        fig.suptitle(f'Input data: {self.norm_columns}', fontsize=18)
+        axes[0].legend(loc='upper left', bbox_to_anchor=(0.0, 1.0), ncol=2,fontsize='xx-small')
 
-    # Iterate through each case, output from items() is a tuple containing case and corresponding features
-    for case, features in post_dict.items():
-        # Extract the 'Nd' and 'IA' data for the current case
-        # Cases are truncated with the min length in order to be stacked as a nparray
-        Nd_data = features['Nd'][:min_length]
-        IA_data = features['IA'][:min_length]
+        plt.tight_layout()
+        plt.savefig(os.path.join(fig_savepath,'input_data','input_Nd_IA'),dpi=dpi)
+        plt.show()
 
-        # Combine 'Nd_data' and 'IA_data' into a single numpy array per case, with each feature as a column. shape: rows, col =  timesteps ,features
-        combined_data = np.column_stack((Nd_data, IA_data))
+    def plot_smoothdata(self,data, smoothed_data, fine_labels, method,dpi=150):
         
-        # Append each combined dataset (2D nparray) per case as an element in a list.
-        array.append(combined_data)
+        fig, ax = plt.subplots(1,2, figsize=(12,8), dpi=dpi, num=2)
+        colors = sns.color_palette("husl", len(self.cases))
+        features = ['Number of drops', 'Interfacial Area']
 
-    # Re-shape array list as a 3D nparray, appending each case horizontally = stacking each case as a column, each column with 2 features 
-    shaped_input = np.stack(array, axis=1)
-    print('(time_step, num_case, num_feature)=', shaped_input.shape)
+        for feature in range(len(features)):
+            for idx, _ in enumerate(self.cases):
 
-    return shaped_input
-
-## smoothing function for shaped data
-
-def smoothing(data, method, window_size=None, poly_order=None, lowess_frac = None):
-    '''
-    Input array : 2D array per feature, with shape (times, cases)
-    Three methods to smooth:
-    
-    'moveavg': requires window_size
-    'savgol': requires window_size, poly_order
-    'lowess': requires lowess_frac
-    '''
-
-    ## rolling window averaging method
-    if method == 'moveavg':
-        if window_size is None:
-            raise ValueError('Window size required')
-        smoothed_data = pd.DataFrame(data).rolling(window_size, axis = 0).mean()
-        smoothed_data.fillna(pd.DataFrame(data),inplace=True)
-    ## SavGol filter based on fitting least-squares polynomial to a window of data points
-    elif method == 'savgol':
-        if window_size is None or poly_order is None:
-            raise ValueError('Mising input arguments: Windowsize/polyorder')
-        smoothed_data = np.apply_along_axis(
-                    lambda col: savgol_filter(col, window_size, poly_order),
-                    axis = 0, arr=data)
-    ## Locally Weighted Scatterplot Smoothing, locally fitting linear regressions
-    elif method == 'lowess':
-        if lowess_frac is None:
-            raise ValueError('Lowess fraction required')
-        smoothed_data = np.apply_along_axis(
-                    lambda col: lowess(col,np.arange(len(col)),frac = lowess_frac,return_sorted=False),
-                    axis = 0, arr = data)
-    else:
-        raise ValueError('Unsupported smoothing method')
-    
-    return smoothed_data
-
-#### PLOTS ####
-
-def plot_inputdata(cases, fine_labels, data,dpi=150):
-    ### looping over the number of features (Nd and IA)
-
-    features = ['Number of drops', 'Interfacial Area']
-    colors = sns.color_palette('muted', len(cases))
-
-    # Create a single figure with multiple subplots
-    fig, axes = plt.subplots(1,2, figsize=(12, 8), dpi=dpi, num=1)
-
-    for i, ax in enumerate(axes):
-        ax.set_title(f'{features[i]}')
-        ax.set_xlabel('Time steps')
-        ax.set_ylabel(f'Scaled {features[i]}')
-
-        for spine in ax.spines.values():
-            spine.set_linewidth(1.5)
-
-        for idx, case in enumerate(cases):
-
-            label = fine_labels.get(case,case)
-            ax.plot(data[:, idx, i], label=f'{label}', color=colors[idx % len(colors)])
-            ax.tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', length=5, width=1.5)
-            ax.grid(color='k', linestyle=':', linewidth=0.1)
-
-    fig.suptitle(f'Input data: {features}', fontsize=18)
-    axes[0].legend(loc='upper left', bbox_to_anchor=(0.0, 1.0), ncol=2,fontsize='xx-small')
-
-    plt.tight_layout()
-    plt.savefig(os.path.join(fig_savepath,'input_data'),dpi=dpi)
-    plt.show()
-
-def plot_smoothdata(data, smoothed_data, fine_labels, method, cases,dpi=150):
-    
-    fig, ax = plt.subplots(1,2, figsize=(12,8), dpi=dpi, num=2)
-    colors = sns.color_palette('muted', len(cases))
-    marker_list = ['o','>','s','^','d','<','X','v','p','P','*']
-    features = ['Number of drops', 'Interfacial Area']
-
-    for feature in range(len(features)):
-        for idx, _ in enumerate(cases):
-
-            ax[0].plot(data[:,idx,feature],color=colors[idx % len(colors)])
-            ax[0].set_title('Data before')
-            ax[0].set_xlabel('Time steps')
-            ax[0].set_ylabel('Scaled data')
-            ax[0].tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', 
-                              length=5, width=1.5)
-            ax[0].grid(color='k', linestyle=':', linewidth=0.1)
-            
-            ax[1].plot(smoothed_data[:,idx,feature],color=colors[idx % len(colors)])
-            ax[1].set_title('Data after')
-            ax[1].set_xlabel('Time steps')
-            ax[1].set_ylabel('Smoothed data')
-            ax[1].tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', 
-                              length=5, width=1.5)
-            ax[1].grid(color='k', linestyle=':', linewidth=0.1)
-    
-    fig.suptitle(f'Smoothing method: {method}', fontsize=18)
-
-    ax[0].legend(labels=[f'{fine_labels.get(case,case)}' for case in cases],
-                 loc='upper left', bbox_to_anchor=(0.0, 1.0), ncol=2,fontsize='xx-small')
-
-    for ax in ax:
-        for spine in ax.spines.values():
-            spine.set_linewidth(1.5)
+                ax[0].plot(data[:,idx,feature],color=colors[idx % len(colors)])
+                ax[0].set_title('Data before')
+                ax[0].set_xlabel('Time steps')
+                ax[0].set_ylabel('Scaled data')
+                ax[0].tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', 
+                                length=5, width=1.5)
+                ax[0].grid(color='k', linestyle=':', linewidth=0.1)
+                
+                ax[1].plot(smoothed_data[:,idx,feature],color=colors[idx % len(colors)])
+                ax[1].set_title('Data after')
+                ax[1].set_xlabel('Time steps')
+                ax[1].set_ylabel('Smoothed data')
+                ax[1].tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', 
+                                length=5, width=1.5)
+                ax[1].grid(color='k', linestyle=':', linewidth=0.1)
         
-    plt.tight_layout()
-    plt.savefig(os.path.join(fig_savepath,'smoothed_data'),dpi=dpi)
-    plt.show()
+        fig.suptitle(f'Smoothing method: {method}', fontsize=18)
+
+        ax[0].legend(labels=[f'{fine_labels.get(case,case)}' for case in self.cases],
+                    loc='upper left', bbox_to_anchor=(0.0, 1.0), ncol=2,fontsize='xx-small')
+
+        for ax in ax:
+            for spine in ax.spines.values():
+                spine.set_linewidth(1.5)
+            
+        plt.tight_layout()
+        plt.savefig(os.path.join(fig_savepath,'input_data','smoothed_data'),dpi=dpi)
+        plt.show()
+
+    def plot_DSD(self,data,bin_edges,fine_labels,dpi=150):
+        
+        t_indices = [65,75,85,95]
+        fig, axes = plt.subplots(2, 2, figsize=(12, 12))
+
+        for idx, t_idx in enumerate(t_indices):
+
+            row = idx // 2
+            col = idx % 2
+
+            for j, case in enumerate(self.cases):
+                label = fine_labels.get(case)
+
+                ax = axes[row, col]
+
+                ax.hist(bin_edges, bins=len(bin_edges), fill=False,weights=data[t_idx, j, 2:].tolist(), label=f'{label}')
+                ax.set_ylabel('Drop count density function')
+                ax.set_xlabel(r'$Log_{10}(V/V_{cap})$')
+                ax.legend()
+                ax.set_title(f'DSD at time {t_idx*0.005} s')
+
+        plt.tight_layout()
+        plt.savefig(os.path.join(fig_savepath,'input_data','DSD_data'),dpi=dpi)
+        plt.show()
+
+## SETUP DSD METHOD ##
+
+def setup_DSD(n_bins,leftmost,rightmost,cases,feature_map,DSD_columns,pre_dict):
+    
+    ## building features to represent all DSD bins
+    for i in range(0,n_bins):
+        key = f'b{i}'
+        DSD_columns.append(key)
+        feature_map[key] = key
+    
+    ## DSD processing class
+    DSD_processor = DSD_processing(cases=cases, num_bins=n_bins)
+
+    ## Pre_dict with bins and drop counts assigned: dc - dropcounts
+    pre_dict_dc, bin_edges = DSD_processor.sort_into_bins(pre_dict)
+
+    ## Filter bins based on left/right most limits
+    pre_dict_dc, bin_width, bins_to_delete, bins_kept = DSD_processor.filter_bins(bin_edges,pre_dict_dc,leftmost,rightmost)
+
+    ## Save a copy of pre_dict with only drop counts just for plotting
+    dc_copy = copy.deepcopy(pre_dict_dc)
+
+    ## Convert bin drop counts into probability density function values
+    pre_dict = DSD_processor.density_func_est(pre_dict_dc,bin_width, bins_kept)
+
+    ## delete bins filtered out from original bin list
+    DSD_columns = [item for item in DSD_columns if item not in bins_to_delete]
+    bin_edges = bin_edges[leftmost:rightmost+1]
+
+    return dc_copy, DSD_columns, bin_edges, feature_map
 
 ## main ##
 
 def main():
-
-    # Allcases = ['b03','b06','bi001','bi01','da01','da1','b06pm','b09pm','bi001pm',
-    # 'bi1','bi01pm','3drop',
-    # 'b09','da01pm','da001', 'coarsepm']
     
-    svcases = ['Bi0001','Bi0004','Bi001','B05','B07','clean_5hz','clean_6hz','clean_7hz','clean_9hz','clean_10hz','B09','Bi1','Bi0002','clean_8hz']
+    # Read the case-specific info from config file
+    mixer_choice = input('Choose the mixing system you would like to pre-process (sm/sv): ')
 
-    # List of columns to be normalized
+    config = configparser.ConfigParser()
+    config.read(os.path.join(os.getcwd(),f'config/config_{mixer_choice}.ini'))
+
+    Allcases = ast.literal_eval(config.get('Cases', 'cases'))
+
+    # Randomizing cases for different train-test set splitting
+    cases = random.sample(Allcases,len(Allcases))
+
+    # List of features to be normalized (without DSD)
+    feature_map = {'Number of drops': 'Nd',
+                   'Interfacial Area': 'IA'
+                   }
     norm_columns = ['Number of drops', 'Interfacial Area']
 
-    # scaled input data 
-    post_dict = scale_inputs(svcases,norm_columns)
+    DSD_columns = []
+
+    ######## RAW DATA PROCESSING ######
+
+   ## raw data pre-processing, extracting and sorting from csv files
+    rd_processor = RawData_processing(cases=Allcases)
+
+    ## post dict empty with case slots built in
+    pre_dict,post_dict = rd_processor.sort_inputdata()
+
+    ######## DSD DATA PROCESSING ######
+
+    DSD_choice = input('Include DSD in LSTM predictions? (y/n): ')
+
+    ## Including DSD data for LSTM prediction: pre-process and data preparation
+    if DSD_choice.lower() == 'y':
+
+        n_bins = int(config['DSD']['n_bins'])
+        leftmost = int(config['DSD']['leftmost'])
+        rightmost = int(config['DSD']['rightmost'])
+        dc_copy, DSD_columns, bin_edges, feature_map = setup_DSD(n_bins,leftmost,rightmost,Allcases,feature_map,DSD_columns,pre_dict)
+
+    ######## POST-PROCESSING ######
+
+    post_processor = Post_processing(cases=Allcases,
+                    norm_columns=norm_columns,feature_map=feature_map,
+                    DSD_choice=DSD_choice,DSD_columns=DSD_columns)
+
+    # scaled input data, in case of DSD: include processed bins into post_dict
+    post_dict = post_processor.scale_inputs(pre_dict,post_dict)
 
     # re-shaped input data
-    shaped_input = shape_inputdata(post_dict)
+    shaped_input = post_processor.shape_inputdata(post_dict)
+
+    ##### DSD PLOTTING #####
+
+    if DSD_choice.lower() == 'y':
+
+        ## reshape pre_dict with bins into numpy array for handling and plotting
+        shaped_data_dc = post_processor.shape_inputdata(dc_copy)
+
+        ## plot drop count histogram
+        post_processor.plot_DSD(shaped_data_dc,bin_edges,fine_labels)
+        ##plot density function histogram
+        post_processor.plot_DSD(shaped_input,bin_edges,fine_labels)
+
+    #### DATA SMOOTHING AND SAVING
 
     #plotting
-    plot_inputdata(svcases,fine_labels,shaped_input)
+    post_processor.plot_inputdata(fine_labels,shaped_input)
 
     # smoothing data
-    smoothed_data = smoothing(shaped_input,'lowess',lowess_frac=0.03)
+    method = config['Smoothing']['method']
+    window_size = config['Smoothing']['window_size']
+    poly_order = config['Smoothing']['poly_order']
+    lowess_frac = config['Smoothing']['lowess_frac']
 
-    plot_smoothdata(shaped_input,smoothed_data,fine_labels,'lowess',svcases)
+    smoothed_data = post_processor.smoothing(shaped_input,method=method,window_size=window_size,poly_order=poly_order,lowess_frac=lowess_frac)
+
+    post_processor.plot_smoothdata(shaped_input, smoothed_data,fine_labels, method)
 
     ## saving input data 
 
-    with open(os.path.join(input_savepath,'svinputdatawC.pkl'),'wb') as file:
-        pickle.dump(smoothed_data,file)
+    save_dict = {'smoothed_data' : smoothed_data,
+                 'case_labels' : Allcases,
+                 'features' : norm_columns+DSD_columns}
+    if DSD_choice.lower() == 'y':
+        save_dict['bin_edges'] = bin_edges
+
+    with open(os.path.join(input_savepath,'inputdata.pkl'),'wb') as file:
+        pickle.dump(save_dict,file)
+
+    print(f'Input data processed and saved to {input_savepath}')
 
 if __name__ == "__main__":
     main()

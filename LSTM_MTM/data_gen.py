@@ -9,27 +9,45 @@ import modeltrain_LSTM as trn
 import random
 import os
 import pickle
+# For input preprocessing methods for different mixers
+import configparser
+import ast
 
-## env. variables 
-trainedmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/trained_svmodels/'
-input_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/input_data/'
+## Env. variables ##
 
+## Setting up paths globally
+
+config_paths = configparser.ConfigParser()
+config_paths.read(os.path.join(os.getcwd(),'config/config_paths.ini'))
+
+input_savepath = config_paths['Path']['input_data']
+trainedmod_savepath = config_paths['Path']['training']
+raw_datapath = config_paths['Path']['raw_data']
 
 ########################################### MAIN ###########################################
 
 def main():
     
+    # Read the case-specific info from config file
+    mixer_choice = input('Choose the mixing system you would like to pre-process (sm/sv): ')
+    config = configparser.ConfigParser()
+    config.read(os.path.join(os.getcwd(),f'config/config_{mixer_choice}.ini'))
+
     ####### WINDOW DATA ########
 
-    ## Windowing hyperparameters
-    steps_in, steps_out = 50, 50
-    stride = 1
+    steps_in, steps_out = int(config['Windowing']['steps_in']), int(config['Windowing']['steps_out'])
+    stride = int(config['Windowing']['stride'])
 
     ## Smoothing parameters
-    smoothing_method = 'lowess'
-    window_size = 5 # needed for moveavg and savgol
-    poly_order = 3 # needed for savgol
-    lowess_frac = 0.03 #needed for lowess
+    smoothing_method = config['Smoothing']['method']
+    window_size = config['Smoothing']['window_size']# needed for moveavg and savgol
+    poly_order = config['Smoothing']['poly_order']# needed for savgol
+    lowess_frac = config['Smoothing']['lowess_frac']#needed for lowess
+
+    ## DSD bin data
+    n_bins = int(config['DSD']['n_bins'])
+    leftmost = int(config['DSD']['leftmost'])
+    rightmost = int(config['DSD']['rightmost'])
 
     smoothing_params = (window_size,poly_order,lowess_frac)
 
@@ -39,18 +57,18 @@ def main():
     if choice.lower() == 'y':
 
         ## Cases to split and features to read from 
-        # Allcases = ['bi001', 'bi01', 'b09', 'b06pm', 'b03', 'da01pm', 'da01', 'bi01pm', '3drop',
-        # 'coarsepm', 'bi001pm', 'bi1',
-        # 'b06', 'b09pm', 'da1', 'da001']
-
-        svcases = ['Bi0001','Bi0004','Bi001','B05','B07','clean','B09','Bi1','Bi0002']
+        Allcases = ast.literal_eval(config.get('Cases', 'cases'))
 
         # Random sampling
-        cases = random.sample(svcases,len(svcases))
+        cases = random.sample(Allcases,len(Allcases))
 
-        features = ['Number of drops', 'Interfacial Area']
+        # List of features to be normalized (without DSD)
+        feature_map = {'Number of drops': 'Nd',
+                    'Interfacial Area': 'IA'
+                    }
+        norm_columns = ['Number of drops', 'Interfacial Area']
 
-        trn.input_data(svcases,features,smoothing_method,smoothing_params)
+        trn.input_data(Allcases,n_bins, leftmost, rightmost, feature_map,norm_columns,smoothing_method,smoothing_params)
 
     # Reading saved re-shaped input data from file
     with open(os.path.join(input_savepath,'svinputdata.pkl'), 'rb') as file:
@@ -60,14 +78,20 @@ def main():
     input_df = input_pkg['smoothed_data']
     Allcases = input_pkg['case_labels']
     features = input_pkg['features']
+    bins = input_pkg.get('bin_edges', None)
+
+    if bins is None:
+        bin_edges = []
+    else:
+        bin_edges = bins
     
     ## data splitting for training, validating and testing
-    train_frac = 0.7
-    test_frac = 0.15
+    train_frac = float(config['Splitting']['train_frac'])
+    test_frac = float(config['Splitting']['test_frac'])
 
-    windowed_data = trn.windowing(steps_in,steps_out,stride,train_frac, test_frac, input_df, Allcases,features)
+    windowed_data = trn.windowing(steps_in,steps_out,stride,train_frac, test_frac, input_df, Allcases,features,bin_edges)
 
-    model_choice = input('Which model would you like to generate data for? (DMS/S2S): ')
+    model_choice = input('Which model would you like to generate data for? (LSTM_FC,LSTM_ED,GRU_FC,GRU_ED): ')
 
     trn.saving_data(windowed_data,hp={},model_choice=model_choice,save_hp=False)
 

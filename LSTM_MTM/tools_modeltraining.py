@@ -1,6 +1,5 @@
 ### LSTM tools for training
-### Author: Juan Pablo Valdes
-### Code adapted from Fuyue Liang LSTM for stirred vessels
+### Author: Juan Pablo Valdes and Fuyue Liang
 ### First commit: Oct, 2023
 ### Department of Chemical Engineering, Imperial College London
 #########################################################################################################################################################
@@ -9,16 +8,17 @@
 import os
 import torch
 import torch.nn as nn
+import configparser
 
 ## Env. variables ##
 
-# trainedmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/trained_models/'
-# tuningmod_savepath = '/Users/mfgmember/Documents/Juan_Static_Mixer/ML/LSTM_SMX/LSTM_MTM/tuning/'
+## Setting up paths globally
 
-#trainedmod_savepath = '/Users/juanpablovaldes/Documents/PhDImperialCollege/LSTM/LSTM_SMX/LSTM_MTM/trained_models/'
+config_paths = configparser.ConfigParser()
+config_paths.read(os.path.join(os.getcwd(),'config/config_paths.ini'))
 
-trainedmod_savepath = '/home/fl18/Desktop/automatework/ML_casestudy/LSTM_SMX/LSTM_MTM/trained_svmodels/'
-# trainedmod_savepath = '/content/fuyue_data/trained_svmodels/'
+trainedmod_savepath = config_paths['Path']['training']
+
 
 ##################################### CLASSES #################################################
 
