@@ -279,7 +279,9 @@ def plot_rollout_pred(rollout_seq, true_data, input_steps, features,set_labels, 
             y_label = feature_labels.get(features[f_idx],features[f_idx])
             ## truedata shaped as (timesteps, cases, features) and rollout as (case,timestep,features)
             r2 = r2_score(true_data[:,i,f_idx],rollout_seq[i,:,f_idx][:true_data.shape[0]])
-            # print(f' R2 {case}, {y_label}: {r2}')
+
+            with open(os.path.join(fig_savepath,'rollouts',f'{model_name}','R^2.txt'),'w') as file:
+                print(f' R2 {case}, {y_label}: {r2}', file = file)
 
             p = plt.plot(true_data[:,i,f_idx], label=f'{plot_label}',color = colors[i % len(colors)],linewidth = 4)
 
@@ -329,7 +331,9 @@ def plot_rollout_pred(rollout_seq, true_data, input_steps, features,set_labels, 
             
                 ## truedata shaped as (timesteps, cases, features) and rollout as (case,timestep,features)
                 r2 = r2_score(true_data[:,i,f_idx],rollout_seq[i,:,f_idx][:true_data.shape[0]])
-                print(f' R2 {case}, {title_label}: {r2}')
+
+                with open(os.path.join(fig_savepath,'rollouts',f'{model_name}','R^2.txt'),'w') as file:
+                    print(f' R2 {case}, {y_label}: {r2}', file = file)
 
                 p = ax.plot(true_data[:,i,f_idx], label=f'Target {plot_label}',color = colors[i % len(colors)],linewidth = 3)
 
@@ -544,8 +548,9 @@ def plot_y_x(model, model_name,set_labels, features,
     mse = torch.mean((cat_truth-cat_pred)**2).item()
     r2 = r2_score(cat_truth, cat_pred)
 
-    print(f"Mean Squared Error for the {type} dataset using {model_name}: {mse}")
-    print(f"R^2 for the {type} dataset using {model_name}: {r2}")
+    with open(os.path.join(fig_savepath,'windowed',f'{model_name}','yx_R^2.txt'),'w') as file:
+        print(f"Mean Squared Error for the {type} dataset using {model_name}: {mse}", file=file)
+        print(f"R^2 for the {type} dataset using {model_name}: {r2}", file=file)
 
     
     ## Plot Y=X line and 15% deviation lines on top
@@ -626,10 +631,12 @@ def plot_rollout_yx(rollout_seq, true_data, input_steps, set_labels, features, m
         set = 'test'
         col = 'b'
 
-    print(f"MSE for the {set} dataset using {model_name}: {mse}")
-    print(f"MAE for the {set} dataset using {model_name}: {mae}")
-    print(f"RMSE for the {set} dataset using {model_name}: {rmse}")
-    print(f"R^2 for the {set} dataset using {model_name}: {r2}")
+    
+    with open(os.path.join(fig_savepath,'rollouts',f'{model_name}','yx_roll_R^2.txt'),'w') as file:
+        print(f"MSE for the {set} dataset using {model_name}: {mse}", file=file)
+        print(f"MAE for the {set} dataset using {model_name}: {mae}", file=file)
+        print(f"RMSE for the {set} dataset using {model_name}: {rmse}", file=file)
+        print(f"R^2 for the {set} dataset using {model_name}: {r2}", file= file)
     
     ## Plot Y=X line and 20% deviation lines on top
     x = np.linspace(0,1,100)
