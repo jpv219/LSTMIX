@@ -270,7 +270,7 @@ def main():
     X_tens, y_tens, _, _ ,_, _ = load_data(model_choice)
 
     # limit the number of CPU cores used for the whole tuning process
-    percent_cpu_to_occupy = 0.3
+    percent_cpu_to_occupy = 0.4
     total_cpus = psutil.cpu_count(logical=False)
     num_cpus_to_allocate = int(total_cpus * percent_cpu_to_occupy)
 
@@ -283,7 +283,7 @@ def main():
             'training_prediction': tune.choice(['none']),
             'tf_ratio': tune.choice([0]),
             'dynamic_tf': tune.choice(['False']),
-            'l1_lambda': tune.choice([0, 0.00001]),
+            'l1_lambda': tune.choice([0, 0.00001,0.0001]),
             'l2_lambda': tune.choice([0, 0.00001,0.0001]),
             'batch_loss': tune.choice(['False']),
             'penalty_weight': tune.choice([0.01,0.1,1,10])
@@ -324,7 +324,7 @@ def main():
 
     ray.shutdown()
     ray.init(num_cpus=num_cpus_to_allocate)
-    num_samples = 6
+    num_samples = 2916
     log_file_path = os.path.join(tuningmod_savepath,model_choice,f'logs/{model_choice}_tune_out.log')
 
     #Decorate the tuner
@@ -374,13 +374,21 @@ def main():
         
         further_train(model_choice,init_training,X_tens,y_tens,best_trial,best_chkpoint)
 
+    performance_file_path = os.path.join(tuningmod_savepath,model_choice,f'logs/{model_choice}_resources_out.log')
+    
     #Reporting code performance
-    print(f'Total time consumed for {model_choice} hyperparameter tuning and further training: {(time.time()-start_time)/60} min')
+    time_out = f'Total time consumed for {model_choice} hyperparameter tuning and further training: {(time.time()-start_time)/60} min'
 
     current, peak = tracemalloc.get_traced_memory()
     tracemalloc.stop()
-    print(f"Memory usage throughout the hyperparameter tuning process {current / 10**6}MB; Peak was {peak / 10**6}MB")
+    memory_out = f"Memory usage throughout the hyperparameter tuning process {current / 10**6}MB; Peak was {peak / 10**6}MB"
 
+    with open(performance_file_path, 'w') as f:
+        f.write(time_out + '\n')
+        f.wrtie(memory_out + '\n')
+
+    print(time_out)
+    print(memory_out)
 
 if __name__ == "__main__":
     main()

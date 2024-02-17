@@ -836,7 +836,7 @@ def train_FC(model_name, model, optimizer, loss_fn, trainloader, valloader, sche
 
         else:
             ### Early stopping feature to avoid overfitting during training, monitoring a minimum improvement threshold
-            early_stopping = EarlyStopping(model_name,patience=2, verbose=True)
+            early_stopping = EarlyStopping(model_name,patience=10, verbose=True)
 
         for epoch in range(num_epochs): #looping through epochs
 
@@ -989,7 +989,7 @@ def train_ED(model_name, model, optimizer, loss_fn, trainloader,valloader,schedu
                         optimizer.load_state_dict(loaded_checkpoint_state['optimizer_state_dict'])
         else:
             ### Early stopping feature to avoid overfitting during training, monitoring a minimum improvement threshold
-            early_stopping = EarlyStopping(model_name,patience=2, verbose=True)
+            early_stopping = EarlyStopping(model_name,patience=10, verbose=True)
 
         for epoch in range(num_epochs): #looping through training epochs
             
