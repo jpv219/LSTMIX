@@ -56,7 +56,7 @@ fine_labels = {
     # svcases #
     'Bi0001': r'$Bi=0.001$', 'Bi0002': r'$Bi=0.002$', 'Bi0004': r'$Bi=0.004$', 'Bi001': r'$Bi=0.01$', 'Bi1': r'$Bi=1$',
     'B05': r'$Bi=0.1, \beta=0.5$','B07': r'$Bi=0.1, \beta=0.7$', 'B09': r'$Bi=0.1, \beta=0.9$',
-    'clean_5hz': r'Cl: 5 Hz','clean_6hz': r'Cl: 6 Hz','clean_7hz': r'Cl: 7 Hz','clean_8hz': r'Cl: 8 Hz','clean_9hz': r'Cl: 9 Hz','clean_10hz': r'Cl: 10 Hz',
+    '5hz': r'Cl: 5 Hz','6hz': r'Cl: 6 Hz','7hz': r'Cl: 7 Hz','8hz': r'Cl: 8 Hz','9hz': r'Cl: 9 Hz','10hz': r'Cl: 10 Hz',
     # smx cases #
     'b03': r'$\beta=0.3$','b06':r'$\beta=0.6$','bi001':r'$Bi=0.01$','bi01':r'$Bi=0.1$','da01': r'$Da=0.1$','da1':r'$Da=1$',
     'b06pm':r'$\beta_{pm}=0.6$','b09pm':r'$\beta_{pm}=0.9$','bi001pm':r'$Bi_{pm}=0.01$',

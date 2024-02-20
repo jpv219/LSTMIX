@@ -308,8 +308,8 @@ def main():
     init = {
         "input_size": X_tens[0].shape[-1],
         "output_size": y_tens[0].shape[-1],
-        "pred_steps": 30,
-        "num_epochs": 150,
+        "pred_steps": 50,
+        "num_epochs": 120,
         "check_epochs": 30
     }
 
@@ -324,7 +324,7 @@ def main():
 
     ray.shutdown()
     ray.init(num_cpus=num_cpus_to_allocate)
-    num_samples = 2592
+    num_samples = 1000
     log_file_path = os.path.join(tuningmod_savepath,model_choice,f'logs/{model_choice}_tune_out.log')
 
     #Decorate the tuner
@@ -365,11 +365,11 @@ def main():
         init_training = {
             "input_size": X_tens[0].shape[-1],
             "output_size": y_tens[0].shape[-1],
-            "pred_steps": 30,
+            "pred_steps": 50,
             "num_epochs": 3000,
             "check_epochs": 100,
-            "steps_in": 40,
-            "steps_out": 30
+            "steps_in": 50,
+            "steps_out": 50
     }
         
         further_train(model_choice,init_training,X_tens,y_tens,best_trial,best_chkpoint)
