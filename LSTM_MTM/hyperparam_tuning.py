@@ -293,10 +293,10 @@ def main():
             'learning_rate': tune.choice([0.002,0.005]),
             'batch_size': tune.choice(range(8, 44, 4)),
             'training_prediction': tune.choice(['recursive','teacher_forcing', 'mixed']),
-            'tf_ratio': tune.choice([0.02,0.1, 0.2, 0.4]),
+            'tf_ratio': tune.choice([0.02,0.1]),
             'dynamic_tf': tune.choice(['True','False']),
-            'l1_lambda': tune.choice([0]),
-            'l2_lambda': tune.choice([0]),
+            'l1_lambda': tune.choice([0,0.00001]),
+            'l2_lambda': tune.choice([0,0.00001]),
             'batch_loss': tune.choice(['False']),
             'penalty_weight': tune.choice([0.1])
         }
@@ -324,7 +324,7 @@ def main():
 
     ray.shutdown()
     ray.init(num_cpus=num_cpus_to_allocate)
-    num_samples = 2916
+    num_samples = 2592
     log_file_path = os.path.join(tuningmod_savepath,model_choice,f'logs/{model_choice}_tune_out.log')
 
     #Decorate the tuner
@@ -385,7 +385,7 @@ def main():
 
     with open(performance_file_path, 'w') as f:
         f.write(time_out + '\n')
-        f.wrtie(memory_out + '\n')
+        f.write(memory_out + '\n')
 
     print(time_out)
     print(memory_out)
