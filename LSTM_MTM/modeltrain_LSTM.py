@@ -26,28 +26,14 @@ import configparser
 import ast
 
 from tools_modeltraining import custom_loss, EarlyStopping
-from input import Post_processing
-from input import RawData_processing
+from input import PostProcessing
+from input import RawDataProcessing
 import input as ipt
 
 ## For tuning
 from ray import train
 from ray.train import Checkpoint
 import ray.cloudpickle as raypickle
-
-
-## Env. variables ##
-
-## Setting up paths globally
-
-config_paths = configparser.ConfigParser()
-config_paths.read(os.path.join(os.getcwd(),'config/config_paths.ini'))
-
-fig_savepath = config_paths['Path']['figures']
-input_savepath = config_paths['Path']['input_data']
-trainedmod_savepath = config_paths['Path']['training']
-tuningmod_savepath = config_paths['Path']['tuning']
-raw_datapath = config_paths['Path']['raw_data']
 
 ## Plot setup
 
@@ -84,7 +70,29 @@ fine_labels = {
 
 ##################################### CLASSES #################################################
 
-class Window_data():
+class PathConfig:
+
+    def __init__(self):
+        self._config = configparser.ConfigParser()
+        self._config.read(os.path.join(os.getcwd(), 'config/config_paths.ini'))
+
+    @property
+    def fig_savepath(self):
+        return self._config['Path']['figures']
+
+    @property
+    def input_savepath(self):
+        return self._config['Path']['input_data']
+    
+    @property
+    def trainedmod_savepath(self):
+        return self._config['Path']['training']
+    
+
+class Window_data(PathConfig):
+
+    def __init__(self):
+        super().__init__()
 
     ## split cases intro train, test and val data sets
     def split_cases(self, df, train_frac, test_frac, cases):
@@ -150,7 +158,7 @@ class Window_data():
                     ax[i].legend()
 
             ## saving figures
-            fig.savefig(os.path.join(fig_savepath,'split_data', f'{label}_data_{features[i]}.png'), dpi=dpi)
+            fig.savefig(os.path.join(self.fig_savepath,'split_data', f'{label}_data_{features[i]}.png'), dpi=dpi)
 
             plt.show()
 
@@ -202,7 +210,7 @@ class Window_data():
                     ax.set_title(f'DSD at time {t_idx*0.005} s')
             
             ## saving figures
-            fig.savefig(os.path.join(fig_savepath, 'split_data',f'{set_label}_DSD_data.png'), dpi=dpi)
+            fig.savefig(os.path.join(self.fig_savepath, 'split_data',f'{set_label}_DSD_data.png'), dpi=dpi)
 
             plt.show()
 
@@ -619,7 +627,10 @@ class GRU_ED(nn.Module):
 # Custom memory profile decorator
 def mem_profile(model):
 
-    file_path = os.path.join(trainedmod_savepath, f'{model}_logs', f"{model}_training_memlog.txt")
+    #Path constructor
+    path = PathConfig()
+
+    file_path = os.path.join(path.trainedmod_savepath, f'{model}_logs', f"{model}_training_memlog.txt")
 
     def decorator(func):
         @wraps(func)
@@ -633,10 +644,13 @@ def mem_profile(model):
 
 def input_data(Allcases, n_bins, leftmost, rightmost, feature_map,norm_columns,smoothing_method,smoothing_params):
 
+    #Path constructor
+    path = PathConfig()
+    
     DSD_columns = []
 
     ###### RAW DATA PROCESSING #####
-    ipt_rp = RawData_processing(Allcases)
+    ipt_rp = RawDataProcessing(Allcases)
 
     ## post dict empty with case slots built in
     pre_dict,post_dict =ipt_rp.sort_inputdata()
@@ -650,7 +664,7 @@ def input_data(Allcases, n_bins, leftmost, rightmost, feature_map,norm_columns,s
         dc_copy, DSD_columns, bin_edges, feature_map = ipt.setup_DSD(n_bins,leftmost,rightmost,Allcases,feature_map,DSD_columns,pre_dict)
 
     ### POST-PROCESSING ###
-    ipt_pp = Post_processing(Allcases, norm_columns,
+    ipt_pp = PostProcessing(Allcases, norm_columns,
                              feature_map,DSD_choice,DSD_columns)
 
     # scaled input data 
@@ -690,7 +704,7 @@ def input_data(Allcases, n_bins, leftmost, rightmost, feature_map,norm_columns,s
     if DSD_choice.lower() == 'y':
         save_dict['bin_edges'] = bin_edges
 
-    with open(os.path.join(input_savepath,'inputdata.pkl'),'wb') as file:
+    with open(os.path.join(path.input_savepath,'inputdata.pkl'),'wb') as file:
         pickle.dump(save_dict,file)
 
 ##################################### WINDOWING FUN. #################################################
@@ -742,6 +756,9 @@ def windowing(steps_in,steps_out,stride,train_frac,test_frac, input_df, Allcases
 
 def saving_data(wd,hp,model_choice,save_hp=True):
     
+    #Path constructor
+    path = PathConfig()
+    
     set_labels = ["train", "val", "test"]
     arrays = [wd.train_arr, wd.val_arr, wd.test_arr]
     input_tensors = [wd.X_train, wd.X_val]
@@ -755,7 +772,7 @@ def saving_data(wd,hp,model_choice,save_hp=True):
         f"{setlbl}_arr": arr,
         "splitset_labels": caselbl_list
     }
-        with open(os.path.join(trainedmod_savepath,f'data_sets_{model_choice}', f'{setlbl}_pkg.pkl'), 'wb') as file:
+        with open(os.path.join(path.trainedmod_savepath,f'data_sets_{model_choice}', f'{setlbl}_pkg.pkl'), 'wb') as file:
             pickle.dump(save_dict, file)
 
         print(f"Saved split set data and labels {setlbl}_pkg.pkl")
@@ -772,8 +789,8 @@ def saving_data(wd,hp,model_choice,save_hp=True):
         f"{setlbl}_casebatch": csbatch
         }
 
-        file_in = os.path.join(trainedmod_savepath,f'data_sets_{model_choice}', f'X_{setlbl}.pt')
-        file_out = os.path.join(trainedmod_savepath,f'data_sets_{model_choice}', f'y_{setlbl}.pt')
+        file_in = os.path.join(path.trainedmod_savepath,f'data_sets_{model_choice}', f'X_{setlbl}.pt')
+        file_out = os.path.join(path.trainedmod_savepath,f'data_sets_{model_choice}', f'y_{setlbl}.pt')
 
         torch.save(save_indict, file_in)
         torch.save(save_outdict, file_out)
@@ -803,7 +820,7 @@ def saving_data(wd,hp,model_choice,save_hp=True):
             "l2": hp.l2
         }
 
-        with open(os.path.join(trainedmod_savepath,f'hyperparams_{model_choice}.txt'), "w") as file:
+        with open(os.path.join(path.trainedmod_savepath,f'hyperparams_{model_choice}.txt'), "w") as file:
 
             for key, value in hyperparams.items():
                 file.write(f"{key}: {value}\n")
@@ -819,7 +836,10 @@ def train_FC(model_name, model, optimizer, loss_fn, trainloader, valloader, sche
     # Code performance tracking metrics
     time_start = time.time()
 
-    with open(os.path.join(trainedmod_savepath,f'{model_name}_logs',str(saveas)+'.txt'), 'w') as f:
+    #Path constructor
+    path = PathConfig()
+
+    with open(os.path.join(path.trainedmod_savepath,f'{model_name}_logs',str(saveas)+'.txt'), 'w') as f:
         print(model, file=f)
 
         ## If a checkpoint state is going to be further trained (e.g., from Ray Tune parametric sweep)
@@ -971,8 +991,11 @@ def train_ED(model_name, model, optimizer, loss_fn, trainloader,valloader,schedu
     # Code performance tracking metrics
     time_start = time.time()
 
+    #Path constructor
+    path = PathConfig()
+
     # save the training model
-    with open(os.path.join(trainedmod_savepath,f'{model_name}_logs',str(saveas)+'.txt'), 'w') as f:
+    with open(os.path.join(path.trainedmod_savepath,f'{model_name}_logs',str(saveas)+'.txt'), 'w') as f:
 
         print(model, file=f)
 
@@ -1165,6 +1188,9 @@ def main():
     start_time = time.time()
     tracemalloc.start()
     
+    #Path constructor
+    path = PathConfig()
+    
     # Read the case-specific info from config file
     mixer_choice = input('Choose the mixing system you would like to pre-process (sm/sv): ')
     config = configparser.ConfigParser()
@@ -1209,7 +1235,7 @@ def main():
         input_data(Allcases,n_bins,leftmost, rightmost, feature_map,norm_columns,smoothing_method,smoothing_params)
 
     # Reading saved re-shaped input data from file
-    with open(os.path.join(input_savepath,'inputdata.pkl'), 'rb') as file:
+    with open(os.path.join(path.input_savepath,'inputdata.pkl'), 'rb') as file:
         input_pkg = pickle.load(file)
 
     # Reading input data sets and labels previously processed and stored
@@ -1247,7 +1273,7 @@ def main():
     # Replacing default hyperparameters with txt file obtained from tuning
     hyper_choice = input('Use tuning hyperparameters if available? (y/n): ')
 
-    hp_path = os.path.join(trainedmod_savepath,f'hyperparams_{model_choice}.txt')
+    hp_path = os.path.join(path.trainedmod_savepath,f'hyperparams_{model_choice}.txt')
 
     if hyper_choice.lower() == 'y' and os.path.exists(hp_path):
 
