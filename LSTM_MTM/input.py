@@ -77,15 +77,16 @@ class PathConfig:
 
 class RawDataProcessing(PathConfig):
 
-    def __init__(self,cases) -> None:
+    def __init__(self,cases,mixer) -> None:
         super().__init__()
         self.cases = cases
+        self.mixer = mixer
         
     ## load raw data per case from csv files
-    def import_rawdata(self,case):
+    def import_rawdata(self,case,mixer,initial=320,stop=704):
 
         file_name_gvol = os.path.join(self.raw_datapath,f"{case}_GVol.csv")
-        file_name_vol = os.path.join(self.raw_datapath,f"{case}_Vol.csv")
+        file_name_vol = os.path.join(self.raw_datapath,f"{case}_Vol.csv") 
 
     # Check if the files exist
         if os.path.isfile(file_name_gvol):
@@ -95,6 +96,8 @@ class RawDataProcessing(PathConfig):
         elif os.path.isfile(file_name_vol):
             # If false, extract only volume array
             df_Vol = Load_Clean_DF.extract_Vol(case)
+            # Extarct the impeller frequency for sv for later truncation
+            f = int(case.split('_')[0][:-2])
         else:
             # Handle the case where neither file exists
             raise FileNotFoundError(f"Neither {file_name_gvol} nor {file_name_vol} found.")
@@ -103,7 +106,16 @@ class RawDataProcessing(PathConfig):
         IntA = pd.read_csv(os.path.join(self.raw_datapath,'IA',f'{case}_IA.csv'))
         Nd = df_Vol['Volume'].apply(lambda x: len(x))
         
-
+        # Truncate the dataset for sv cases:
+        if mixer == 'sv':
+            if 'f' in locals():
+                opt = 1/32/f
+            else:
+                opt = 0.00625    
+            df_Vol = df_Vol.loc[(round(df_Vol['Time']/opt) >= initial) & (round(df_Vol['Time']/opt) <= stop)]
+            IntA = IntA.loc[(round(IntA['Time']/opt) >= initial) & (round(IntA['Time']/opt) <= stop)]
+            Nd = df_Vol['Volume'].apply(lambda x: len(x))
+            
         return df_Vol, Nd, IntA
 
     ## group input data into case-wise dictionary
@@ -116,7 +128,7 @@ class RawDataProcessing(PathConfig):
         # Loop through all cases
         for case in self.cases:
             # Extract raw data
-            df_Vol, Nd, IntA = self.import_rawdata(case)
+            df_Vol, Nd, IntA = self.import_rawdata(case,self.mixer)
             
             time = IntA['Time']
             n_drops = Nd
@@ -559,7 +571,7 @@ def main():
     ######## RAW DATA PROCESSING ######
 
    ## raw data pre-processing, extracting and sorting from csv files
-    rd_processor = RawDataProcessing(cases=Allcases)
+    rd_processor = RawDataProcessing(cases=Allcases,mixer=mixer_choice)
 
     ## post dict empty with case slots built in
     pre_dict,post_dict = rd_processor.sort_inputdata()
