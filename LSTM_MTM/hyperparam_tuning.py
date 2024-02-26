@@ -30,28 +30,32 @@ from ray import tune
 from ray.tune.schedulers import ASHAScheduler
 import ray.cloudpickle as raypickle
 
+class PathConfig:
 
-## Env. variables ##
-
-## Setting up paths globally
-
-config_paths = configparser.ConfigParser()
-config_paths.read(os.path.join(os.getcwd(),'config/config_paths.ini'))
-
-fig_savepath = config_paths['Path']['figures']
-input_savepath = config_paths['Path']['input_data']
-trainedmod_savepath = config_paths['Path']['training']
-tuningmod_savepath = config_paths['Path']['tuning']
+    def __init__(self):
+        self._config = configparser.ConfigParser()
+        self._config.read(os.path.join(os.getcwd(), 'config/config_paths.ini'))
+    
+    @property
+    def trainedmod_savepath(self):
+        return self._config['Path']['training']
+    
+    @property
+    def tuningmod_savepath(self):
+        return self._config['Path']['tuning']
 
 ##################################### DECORATORS #################################################
 
 # Custom memory profile decorator
 def mem_profile(folder,model):
 
+    #Path constructor
+    path = PathConfig()
+    
     if folder == 'tuning':
-        file_path = os.path.join(tuningmod_savepath, model,'logs', f"{model}_tuning_memlog.txt")
+        file_path = os.path.join(path.tuningmod_savepath, model,'logs', f"{model}_tuning_memlog.txt")
     else:
-        file_path = os.path.join(trainedmod_savepath, f'{model}_logs', f"{model}_furthertrain_memlog.txt")
+        file_path = os.path.join(path.trainedmod_savepath, f'{model}_logs', f"{model}_furthertrain_memlog.txt")
 
     def decorator(func):
         @wraps(func)
@@ -67,7 +71,7 @@ def train_tune(config, model_choice, init, X_tens, y_tens, best_chkpt_path, tuni
     '''
     init: Initialization (non-tunable) parameters for LSTM class
     config: receives the hyperparameters we would like to train with;
-    '''     
+    '''
     ## Dataloader and loss fun
     loss_fn = custom_loss(config['penalty_weight'])
     
@@ -148,6 +152,10 @@ def train_tune(config, model_choice, init, X_tens, y_tens, best_chkpt_path, tuni
 
 
 def load_data(model_choice):
+    
+    #Path constructor
+    path = PathConfig()
+
     ##### LOADING DATA ######
 
     # Initializing loading containers
@@ -162,7 +170,7 @@ def load_data(model_choice):
     testset_labels = []
 
     ## Loading test_numpy array
-    npfile = os.path.join(trainedmod_savepath,f'data_sets_{model_choice}', f'{set_labels[-1]}_pkg.pkl')
+    npfile = os.path.join(path.trainedmod_savepath,f'data_sets_{model_choice}', f'{set_labels[-1]}_pkg.pkl')
 
     with open(npfile, 'rb') as file:
         test_pkg = pickle.load(file)
@@ -172,8 +180,8 @@ def load_data(model_choice):
 
     ## Loading training and validation windowed tensors
     for setlbl in set_labels:
-        in_ptfile = os.path.join(trainedmod_savepath,f'data_sets_{model_choice}', f'X_{setlbl}.pt')
-        out_ptfile = os.path.join(trainedmod_savepath,f'data_sets_{model_choice}', f'y_{setlbl}.pt')
+        in_ptfile = os.path.join(path.trainedmod_savepath,f'data_sets_{model_choice}', f'X_{setlbl}.pt')
+        out_ptfile = os.path.join(path.trainedmod_savepath,f'data_sets_{model_choice}', f'y_{setlbl}.pt')
 
         if os.path.exists(in_ptfile) and os.path.exists(out_ptfile):
 
@@ -193,6 +201,9 @@ def load_data(model_choice):
 def run_tuning(config, model_choice, init, X_tens, y_tens, scheduler, 
                num_samples, log_file_path, best_chkpt_path, tuning):
     
+    #Path constructor
+    path = PathConfig()
+    
     with open(log_file_path, 'w',encoding='utf-8', errors='ignore') as f, redirect_stdout(f):
 
         try:
@@ -207,7 +218,7 @@ def run_tuning(config, model_choice, init, X_tens, y_tens, scheduler,
                 config=config,
                 num_samples=num_samples,
                 scheduler=scheduler,
-                local_dir=os.path.join(tuningmod_savepath, model_choice)
+                local_dir=os.path.join(path.tuningmod_savepath, model_choice)
             )
 
             return tuner
@@ -217,6 +228,9 @@ def run_tuning(config, model_choice, init, X_tens, y_tens, scheduler,
 
 
 def further_train(model_choice, init_training, X_tens, y_tens, best_trial,best_chkpt):
+    
+    #Path constructor
+    path = PathConfig()
     
     config_training = best_trial.config
 
@@ -241,7 +255,7 @@ def further_train(model_choice, init_training, X_tens, y_tens, best_trial,best_c
         "l2" : config_training['l2_lambda']
     }
 
-    with open(os.path.join(trainedmod_savepath,f'hyperparams_{model_choice}.txt'), "w") as file:
+    with open(os.path.join(path.trainedmod_savepath,f'hyperparams_{model_choice}.txt'), "w") as file:
 
         for key, value in hyperparams.items():
             file.write(f"{key}: {value}\n")
@@ -258,6 +272,9 @@ def main():
     #Code performance tracking metrics
     start_time = time.time()
     tracemalloc.start()
+
+    #Path constructor
+    path = PathConfig()
     
     ## Selection of Neural net architecture and RNN unit type
     net_choice = input('Select a network to use for predictions (GRU/LSTM): ')
@@ -325,7 +342,7 @@ def main():
     ray.shutdown()
     ray.init(num_cpus=num_cpus_to_allocate)
     num_samples = 1000
-    log_file_path = os.path.join(tuningmod_savepath,model_choice,f'logs/{model_choice}_tune_out.log')
+    log_file_path = os.path.join(path.tuningmod_savepath,model_choice,f'logs/{model_choice}_tune_out.log')
 
     #Decorate the tuner
     tune_dec = mem_profile(folder='tuning',model=model_choice)(run_tuning)
@@ -345,7 +362,7 @@ def main():
     print(f'Best trial config: {best_trial.config}')
 
     # Saving best model and config to external path
-    best_model_path = os.path.join(tuningmod_savepath,f'best_models/{model_choice}')
+    best_model_path = os.path.join(path.tuningmod_savepath,f'best_models/{model_choice}')
 
     shutil.copy(f'{best_chkpoint.path}/chk_dict.pkl',best_model_path)
 
@@ -374,7 +391,7 @@ def main():
         
         further_train(model_choice,init_training,X_tens,y_tens,best_trial,best_chkpoint)
 
-    performance_file_path = os.path.join(tuningmod_savepath,model_choice,f'logs/{model_choice}_resources_out.log')
+    performance_file_path = os.path.join(path.tuningmod_savepath,model_choice,f'logs/{model_choice}_resources_out.log')
     
     #Reporting code performance
     time_out = f'Total time consumed for {model_choice} hyperparameter tuning and further training: {(time.time()-start_time)/60} min'

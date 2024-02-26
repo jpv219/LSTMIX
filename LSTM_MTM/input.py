@@ -22,18 +22,6 @@ import copy
 import configparser
 import ast
 
-## Env. variables ##
-
-## Setting up paths globally
-
-config_paths = configparser.ConfigParser()
-config_paths.read(os.path.join(os.getcwd(),'config/config_paths.ini'))
-
-fig_savepath = config_paths['Path']['figures']
-input_savepath = config_paths['Path']['input_data']
-trainedmod_savepath = config_paths['Path']['training']
-raw_datapath = config_paths['Path']['raw_data']
-
 ## Plot setup
 
 plt.rcParams.update({
@@ -69,16 +57,35 @@ fine_labels = {
 
 ##### CLASSES #####
 
-class RawData_processing():
+class PathConfig:
+
+    def __init__(self):
+        self._config = configparser.ConfigParser()
+        self._config.read(os.path.join(os.getcwd(), 'config/config_paths.ini'))
+
+    @property
+    def fig_savepath(self):
+        return self._config['Path']['figures']
+
+    @property
+    def input_savepath(self):
+        return self._config['Path']['input_data']
+
+    @property
+    def raw_datapath(self):
+        return self._config['Path']['raw_data']
+
+class RawDataProcessing(PathConfig):
 
     def __init__(self,cases) -> None:
+        super().__init__()
         self.cases = cases
         
     ## load raw data per case from csv files
     def import_rawdata(self,case):
 
-        file_name_gvol = os.path.join(raw_datapath,f"{case}_GVol.csv")
-        file_name_vol = os.path.join(raw_datapath,f"{case}_Vol.csv")
+        file_name_gvol = os.path.join(self.raw_datapath,f"{case}_GVol.csv")
+        file_name_vol = os.path.join(self.raw_datapath,f"{case}_Vol.csv")
 
     # Check if the files exist
         if os.path.isfile(file_name_gvol):
@@ -93,7 +100,7 @@ class RawData_processing():
             raise FileNotFoundError(f"Neither {file_name_gvol} nor {file_name_vol} found.")
         
         # Extract number of drops (Nd) and interfacial area (IntA)
-        IntA = pd.read_csv(os.path.join(raw_datapath,'IA',f'{case}_IA.csv'))
+        IntA = pd.read_csv(os.path.join(self.raw_datapath,'IA',f'{case}_IA.csv'))
         Nd = df_Vol['Volume'].apply(lambda x: len(x))
         
 
@@ -116,8 +123,8 @@ class RawData_processing():
             IA = IntA['IA']
             DSD = df_Vol['Volume']
 
-            file_name_gvol = os.path.join(raw_datapath,f"{case}_GVol.csv")
-            file_name_vol = os.path.join(raw_datapath,f"{case}_Vol.csv")
+            file_name_gvol = os.path.join(self.raw_datapath,f"{case}_GVol.csv")
+            file_name_vol = os.path.join(self.raw_datapath,f"{case}_Vol.csv")
             
             # Determine if case needs surf. conc. or clean
             if os.path.isfile(file_name_vol):
@@ -133,9 +140,10 @@ class RawData_processing():
         
         return pre_dict, post_dict
 
-class DSD_processing():
+class DSDProcessing(PathConfig):
 
     def __init__(self,cases,num_bins) -> None:
+        super().__init__()
         self.cases = cases
         self.num_bins = num_bins
 
@@ -276,9 +284,10 @@ class DSD_processing():
 
         return f_pre_dict
 
-class Post_processing():
+class PostProcessing(PathConfig):
 
     def __init__(self,cases,norm_columns,feature_map,DSD_choice:str,DSD_columns) -> None:
+        super().__init__()
         self.cases = cases
         self.norm_columns = norm_columns
         self.DSD_columns = DSD_columns
@@ -424,7 +433,7 @@ class Post_processing():
         axes[0].legend(loc='upper left', bbox_to_anchor=(0.0, 1.0), ncol=2,fontsize='xx-small')
 
         plt.tight_layout()
-        plt.savefig(os.path.join(fig_savepath,'input_data','input_Nd_IA'),dpi=dpi)
+        plt.savefig(os.path.join(self.fig_savepath,'input_data','input_Nd_IA'),dpi=dpi)
         plt.show()
 
     def plot_smoothdata(self,data, smoothed_data, fine_labels, method,dpi=150):
@@ -462,7 +471,7 @@ class Post_processing():
                 spine.set_linewidth(1.5)
             
         plt.tight_layout()
-        plt.savefig(os.path.join(fig_savepath,'input_data','smoothed_data'),dpi=dpi)
+        plt.savefig(os.path.join(self.fig_savepath,'input_data','smoothed_data'),dpi=dpi)
         plt.show()
 
     def plot_DSD(self,data,bin_edges,fine_labels,dpi=150):
@@ -487,7 +496,7 @@ class Post_processing():
                 ax.set_title(f'DSD at time {t_idx*0.005} s')
 
         plt.tight_layout()
-        plt.savefig(os.path.join(fig_savepath,'input_data','DSD_data'),dpi=dpi)
+        plt.savefig(os.path.join(self.fig_savepath,'input_data','DSD_data'),dpi=dpi)
         plt.show()
 
 ## SETUP DSD METHOD ##
@@ -501,7 +510,7 @@ def setup_DSD(n_bins,leftmost,rightmost,cases,feature_map,DSD_columns,pre_dict):
         feature_map[key] = key
     
     ## DSD processing class
-    DSD_processor = DSD_processing(cases=cases, num_bins=n_bins)
+    DSD_processor = DSDProcessing(cases=cases, num_bins=n_bins)
 
     ## Pre_dict with bins and drop counts assigned: dc - dropcounts
     pre_dict_dc, bin_edges = DSD_processor.sort_into_bins(pre_dict)
@@ -525,6 +534,9 @@ def setup_DSD(n_bins,leftmost,rightmost,cases,feature_map,DSD_columns,pre_dict):
 
 def main():
     
+    # Path constructor
+    path = PathConfig()
+    
     # Read the case-specific info from config file
     mixer_choice = input('Choose the mixing system you would like to pre-process (sm/sv): ')
 
@@ -547,7 +559,7 @@ def main():
     ######## RAW DATA PROCESSING ######
 
    ## raw data pre-processing, extracting and sorting from csv files
-    rd_processor = RawData_processing(cases=Allcases)
+    rd_processor = RawDataProcessing(cases=Allcases)
 
     ## post dict empty with case slots built in
     pre_dict,post_dict = rd_processor.sort_inputdata()
@@ -566,7 +578,7 @@ def main():
 
     ######## POST-PROCESSING ######
 
-    post_processor = Post_processing(cases=Allcases,
+    post_processor = PostProcessing(cases=Allcases,
                     norm_columns=norm_columns,feature_map=feature_map,
                     DSD_choice=DSD_choice,DSD_columns=DSD_columns)
 
@@ -611,10 +623,10 @@ def main():
     if DSD_choice.lower() == 'y':
         save_dict['bin_edges'] = bin_edges
 
-    with open(os.path.join(input_savepath,'inputdata.pkl'),'wb') as file:
+    with open(os.path.join(path.input_savepath,'inputdata.pkl'),'wb') as file:
         pickle.dump(save_dict,file)
 
-    print(f'Input data processed and saved to {input_savepath}')
+    print(f'Input data processed and saved to {path.input_savepath}')
 
 if __name__ == "__main__":
     main()

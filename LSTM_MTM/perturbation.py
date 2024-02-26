@@ -11,22 +11,12 @@ import torch
 import matplotlib.pyplot as plt
 import seaborn as sns
 from modeltrain_LSTM import LSTM_FC, LSTM_ED, GRU_FC, GRU_ED
-from rollout_prediction import rollout
+from rollout_prediction import Rollout
 import numpy as np
 from sklearn.metrics import r2_score
 from contextlib import redirect_stdout
 import io
 import configparser
-
-## Env. variables ##
-
-## Setting up paths globally
-
-config_paths = configparser.ConfigParser()
-config_paths.read(os.path.join(os.getcwd(),'config/config_paths.ini'))
-
-fig_savepath = config_paths['Path']['figures']
-trainedmod_savepath = config_paths['Path']['training']
 
 ## Plot setup
 
@@ -61,6 +51,19 @@ fine_labels = {
     'bi1a': r'$Bi_{alt4}=1', 'bi01a': r'$Bi_{alt4}=01', 'bi001a': r'$Bi_{alt4}=0.01'
 }
 
+class PathConfig:
+
+    def __init__(self):
+        self._config = configparser.ConfigParser()
+        self._config.read(os.path.join(os.getcwd(), 'config/config_paths.ini'))
+    
+    @property
+    def trainedmod_savepath(self):
+        return self._config['Path']['training']
+    
+    @property
+    def fig_savepath(self):
+        return self._config['Path']['figures']
 
 ############################ Uncertainty Estimation #########################################################################
 
@@ -111,6 +114,9 @@ def uncertainty_uni(pertb_preds):
 def plot_ensem_pred(model_name,features,scale,c_idx, case_label,
                     rollout_ref,true_data,rollouts_pertb):
 
+    #Path constructor
+    path = PathConfig()
+    
     num_features = len(features)
 
     colors = sns.color_palette("vlag", len(rollouts_pertb))
@@ -146,13 +152,16 @@ def plot_ensem_pred(model_name,features,scale,c_idx, case_label,
         plt.grid(color='k', linestyle=':', linewidth=0.1)
         plt.tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', length=5, width=1.5)
 
-        fig.savefig(os.path.join(os.path.join(fig_savepath,'perturbations',model_name), 
+        fig.savefig(os.path.join(os.path.join(path.fig_savepath,'perturbations',model_name), 
                                  f'Perturbed_rollout_{model_name}_{features[f_idx]}.png'), dpi=150)
         plt.show()
 
 # Function to plot uncertainty from perturbed rollout sequence
 def plot_ensem_uncertainty(model_name,features,scale,c_idx, case_label,
                     rollout_ref,true_data,rollouts_pertb_mean,lower_bound,upper_bound):
+    
+    #Path constructor
+    path = PathConfig()
     
     num_features = len(features)
     plot_label = fine_labels.get(case_label,case_label)
@@ -187,14 +196,16 @@ def plot_ensem_uncertainty(model_name,features,scale,c_idx, case_label,
         plt.grid(color='k', linestyle=':', linewidth=0.1)
         plt.tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', length=5, width=1.5)
 
-        fig.savefig(os.path.join(os.path.join(fig_savepath,'perturbations',model_name), f'Uncertainty_rollout_{model_name}_{features[f_idx]}.png'), dpi=150)
+        fig.savefig(os.path.join(os.path.join(path.fig_savepath,'perturbations',model_name), f'Uncertainty_rollout_{model_name}_{features[f_idx]}.png'), dpi=150)
         plt.show()
 
 ########################################################################################
 def main():
     
+    #Path constructor
+    path = PathConfig()
+    
     features = ['Number of drops', 'Interfacial Area']
-
 
     ## Selection of Neural net architecture and RNN unit type
     net_choice = input('Select a network to use for predictions (GRU/LSTM): ')
@@ -216,15 +227,25 @@ def main():
     ## Loading relevant data saved from training step
     
     ## Hyperparameter loading
-    with open(os.path.join(trainedmod_savepath,f'hyperparams_{model_choice}.txt'), "r") as file:
+    with open(os.path.join(path.trainedmod_savepath,f'hyperparams_{model_choice}.txt'), "r") as file:
         for line in file:
             key, value = line.strip().split(": ")  # Split each line into key and value
             hyperparams[key] = eval(value)
 
+    ##Renaming recurrent hyperparameters for legibility
+    input_size = hyperparams["input_size"]
+    hidden_size = hyperparams["hidden_size"]
+    output_size = hyperparams["output_size"]
+    pred_steps = hyperparams["pred_steps"]
+    steps_in = hyperparams["steps_in"]
+    steps_out = hyperparams["steps_out"]
+    l1 = hyperparams["l1"]
+    l2 = hyperparams["l2"]
+
     ## Loading numpyarrays for all split datasets and labels, as well as windowed training and val tensors with casebatch lengths
     for setlbl in set_labels:
-        npfile = os.path.join(trainedmod_savepath,f'data_sets_{model_choice}', f'{setlbl}_pkg.pkl')
-        ptfile = os.path.join(trainedmod_savepath,f'data_sets_{model_choice}', f'X_{setlbl}.pt')
+        npfile = os.path.join(path.trainedmod_savepath,f'data_sets_{model_choice}', f'{setlbl}_pkg.pkl')
+        ptfile = os.path.join(path.trainedmod_savepath,f'data_sets_{model_choice}', f'X_{setlbl}.pt')
 
         ## Loading pkg with input data as numpyarrays before windowing
         with open(npfile, 'rb') as file:
@@ -240,48 +261,48 @@ def main():
             casebatches.append(save_tens[f"{setlbl}_casebatch"])
     
     ##### PERTURBATIONS #####
+
+    # Rollout instance        
+    rollout = Rollout(input_size,output_size,steps_in,steps_out)
+
     num_pertb = 50 # number of perturbed sequences to generate
     pertb_scales = [0.2] # Perturbation scaling factor
 
     if model_choice == 'LSTM_FC':
-        model = LSTM_FC(hyperparams["input_size"], hyperparams["hidden_size"],
-                         hyperparams["output_size"], hyperparams["pred_steps"],
-                            l1_lambda=hyperparams["l1"], l2_lambda=hyperparams["l2"])
+        model = LSTM_FC(input_size, hidden_size,output_size, pred_steps,
+                            l1_lambda=l1, l2_lambda=l2)
     elif model_choice == 'LSTM_ED':
-        model = LSTM_ED(hyperparams["input_size"], hyperparams["hidden_size"],
-                         hyperparams["output_size"],hyperparams["pred_steps"], 
-                         l1_lambda=hyperparams["l1"], l2_lambda=hyperparams["l2"])
+        model = LSTM_ED(input_size, hidden_size,output_size, pred_steps,
+                            l1_lambda=l1, l2_lambda=l2)
     elif model_choice == 'GRU_FC':
-        model = GRU_FC(hyperparams["input_size"], hyperparams["hidden_size"],
-                         hyperparams["output_size"], hyperparams["pred_steps"],
-                            l1_lambda=hyperparams["l1"], l2_lambda=hyperparams["l2"])
+        model = GRU_FC(input_size, hidden_size,output_size, pred_steps,
+                            l1_lambda=l1, l2_lambda=l2)
     elif model_choice == 'GRU_ED':
-        model = GRU_ED(hyperparams["input_size"], hyperparams["hidden_size"],
-                         hyperparams["output_size"], hyperparams["pred_steps"],
-                            l1_lambda=hyperparams["l1"], l2_lambda=hyperparams["l2"])
+        model = GRU_ED(input_size, hidden_size,output_size, pred_steps,
+                            l1_lambda=l1, l2_lambda=l2)
 
 
     ## Load the last saved best model         
-    model.load_state_dict(torch.load(os.path.join(trainedmod_savepath,f'{model_choice}_trained_model.pt')))
+    model.load_state_dict(torch.load(os.path.join(path.trainedmod_savepath,f'{model_choice}_trained_model.pt')))
 
     ## Extract testing dataset
     test_arr = arrays[2]
 
     ## Extracting input steps from test data, keeping all cases and features in shape (in_steps,cases,features)
     c_idx = 1 # test case index for uncertainty estimation
-    input_seq = test_arr[:hyperparams["steps_in"],c_idx:(c_idx+1),:]
+    input_seq = test_arr[:steps_in,c_idx:(c_idx+1),:]
     case_label = splitset_labels[2][c_idx]
     
 
     # Total steps to predict
-    total_steps = test_arr.shape[0] - hyperparams["steps_in"]
+    total_steps = test_arr.shape[0] - steps_in
 
     # Create a "null" object to redirect stdout
     null_output = io.StringIO()
 
     # Use the context manager to suppress prints
     with redirect_stdout(null_output):
-        rollout_ref = rollout(model, input_seq, hyperparams["steps_out"], total_steps)
+        rollout_ref = rollout.rollout(model, input_seq, total_steps)
 
     ## ITERATION: perturbed prediction from perturbed input sequences
     pertb_perd_intvs = []
@@ -295,7 +316,7 @@ def main():
         # Rollingout predictions per perturbed input.
         for i in range(len(pertb_input)):
             with redirect_stdout(null_output):
-                pertb_pred = rollout(model, pertb_input[i],hyperparams["steps_out"],total_steps) #Rollout prediction from perturbed input sequence [i]
+                pertb_pred = rollout.rollout(model, pertb_input[i],total_steps) #Rollout prediction from perturbed input sequence [i]
             rollouts_pertb.append(pertb_pred) #saving iteration to list
         
         plot_ensem_pred(model_choice,features,scale,c_idx, case_label, rollout_ref,test_arr,rollouts_pertb)

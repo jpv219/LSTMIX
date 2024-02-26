@@ -13,20 +13,29 @@ import pickle
 import configparser
 import ast
 
-## Env. variables ##
 
-## Setting up paths globally
+class PathConfig:
 
-config_paths = configparser.ConfigParser()
-config_paths.read(os.path.join(os.getcwd(),'config/config_paths.ini'))
+    def __init__(self):
+        self._config = configparser.ConfigParser()
+        self._config.read(os.path.join(os.getcwd(), 'config/config_paths.ini'))
 
-input_savepath = config_paths['Path']['input_data']
-trainedmod_savepath = config_paths['Path']['training']
-raw_datapath = config_paths['Path']['raw_data']
+    @property
+    def input_savepath(self):
+        return self._config['Path']['input_data']
+    
+    @property
+    def trainedmod_savepath(self):
+        return self._config['Path']['training']
+    
+
 
 ########################################### MAIN ###########################################
 
 def main():
+
+    # Path constructor
+    path = PathConfig()
     
     # Read the case-specific info from config file
     mixer_choice = input('Choose the mixing system you would like to pre-process (sm/sv): ')
@@ -71,7 +80,7 @@ def main():
         trn.input_data(Allcases,n_bins, leftmost, rightmost, feature_map,norm_columns,smoothing_method,smoothing_params)
 
     # Reading saved re-shaped input data from file
-    with open(os.path.join(input_savepath,'inputdata.pkl'), 'rb') as file:
+    with open(os.path.join(path.input_savepath,'inputdata.pkl'), 'rb') as file:
         input_pkg = pickle.load(file)
 
     # Reading input data sets and labels previously processed and stored
@@ -95,7 +104,7 @@ def main():
 
     trn.saving_data(windowed_data,hp={},model_choice=model_choice,save_hp=False)
 
-    print(f'Saved data succesfully in {trainedmod_savepath}/data_sets_{model_choice}')
+    print(f'Saved data succesfully in {path.trainedmod_savepath}/data_sets_{model_choice}')
 
 
 ## Saving data for hyperparam tuning
