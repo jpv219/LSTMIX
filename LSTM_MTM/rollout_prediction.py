@@ -82,7 +82,7 @@ class PathConfig:
 class Rollout(PathConfig):
 
     #Constructor
-    def __init__(self,input_size,output_size,steps_in,steps_out):
+    def __init__(self,input_size,output_size,steps_in,steps_out,mixer):
 
         super().__init__()
 
@@ -91,6 +91,7 @@ class Rollout(PathConfig):
         self.steps_in = steps_in
         self.steps_out = steps_out
         self.wind_size = self.steps_in + self.steps_out
+        self.mixer = mixer
 
     ####################################### ROLLOUT PREDICTION #####################################
 
@@ -220,7 +221,7 @@ class Rollout(PathConfig):
                     handler_map = {tuple: mpl.legend_handler.HandlerTuple(None)},
                     loc='lower right',#fontsize=30,
                     edgecolor='black', frameon=True)
-            ax.set_title(f'Prediction with LSTM {model_name} for {features[f_idx]} in {set} set')
+            ax.set_title(f'Prediction with {model_name} for {features[f_idx]} in {set} set')
             ax.set_xlabel('Time steps')
             ax.set_ylabel(f'Scaled {features[f_idx]}')
             ax.grid(color='k', linestyle=':', linewidth=0.1)
@@ -277,7 +278,7 @@ class Rollout(PathConfig):
 
             fig2.supxlabel('Time steps',fontsize=30)
             fig2.supylabel('PD per DSD bin',fontsize=30)
-            fig2.suptitle(f'Prediction with LSTM {model_name} for DSD {set} set',fontsize=40)
+            fig2.suptitle(f'Prediction with {model_name} for DSD {set} set',fontsize=40)
             fig2.savefig(os.path.join(self.fig_savepath, 'windowed',f'{model_name}',f'Predall_{model_name}_DSD_{set}_set.png'), dpi=150)
             plt.show()
 
@@ -327,7 +328,7 @@ class Rollout(PathConfig):
             plt.legend()
             if f_idx == 0:
                 h,l = [a for a in ax.get_legend_handles_labels()]
-                plt.legend(title='Static Mixer', title_fontsize=30,
+                plt.legend(title= self.mixer, title_fontsize=30,
                         handles=zip(h[::2],h[1::2]), labels=l[::2], # ::2 every two elements
                         handler_map = {tuple: mpl.legend_handler.HandlerTuple(None)},
                         loc='upper left',fontsize=25,
@@ -376,7 +377,7 @@ class Rollout(PathConfig):
                         ax.spines[axis].set_linewidth(1.5)  # change width
                 
                 h,l = [a for a in ax.get_legend_handles_labels()]
-                axes2[-1].legend(title='Static Mixer', title_fontsize=18,
+                axes2[-1].legend(title=self.mixer, title_fontsize=18,
                         handles=zip(h[::2],h[1::2]), labels=l[::2], # ::2 every two elements
                         handler_map = {tuple: mpl.legend_handler.HandlerTuple(None)},
                         loc='upper right',fontsize=14,
@@ -485,7 +486,7 @@ class Rollout(PathConfig):
             axes.set_ylabel('Wasserstein distance',fontweight='bold',fontsize=30)
             axes.set_xlabel(r'Time steps',fontweight='bold',fontsize=30)
             axes.tick_params(axis='both',labelsize=20)
-            axes.legend(title='Encoder-decoder: Static mixer', title_fontsize=20,
+            axes.legend(title=f'{model_name}: {self.mixer}', title_fontsize=20,
                             loc='upper right',fontsize=16,
                             edgecolor='black', frameon=True) 
 
@@ -613,7 +614,7 @@ class Rollout(PathConfig):
         ## Plot configuration and styling
         plt.xlabel('True Data',fontsize=40,fontdict=dict(weight='bold'))
         plt.ylabel('Predicted Data',fontsize=40,fontdict=dict(weight='bold'))
-        legend = plt.legend(ncol=2,title='Static Mixer',title_fontsize=18,fontsize=13,
+        legend = plt.legend(ncol=2,title=self.mixer,title_fontsize=18,fontsize=13,
                         edgecolor='black', frameon=True)
         for handle in legend.legendHandles:
             handle.set_markersize(10)
@@ -699,7 +700,7 @@ class Rollout(PathConfig):
         plt.xlabel('True Data',fontsize=40,fontdict=dict(weight='bold'))
         plt.ylabel('Predicted Data',fontsize=40,fontdict=dict(weight='bold'))
 
-        legend = plt.legend(ncol=2,title='Static Mixer',title_fontsize=20,fontsize=14,
+        legend = plt.legend(ncol=2,title=self.mixer,title_fontsize=20,fontsize=14,
                         edgecolor='black', frameon=True)
         for handle in legend.legendHandles:
             handle.set_markersize(10)
@@ -722,6 +723,12 @@ def main():
 
     #Path Constructor
     path = PathConfig()
+
+    # Labels and titles for plots
+    mixer_choice = input('Rollout predictions for which mixer? (sv,sm): ')
+    titles = {'sm': 'Static Mixer', 'sv': 'Stirred Mixer'}
+    mixer_title = titles.get(mixer_choice,'Input error')
+
 
     # Reading saved re-shaped input data from file
     with open(os.path.join(path.input_savepath,'inputdata.pkl'), 'rb') as file:
@@ -791,7 +798,7 @@ def main():
     ##### PREDICTIONS #####
 
     # Rollout instance        
-    rollout = Rollout(input_size,output_size,steps_in,steps_out)
+    rollout = Rollout(input_size,output_size,steps_in,steps_out,mixer_title)
 
     if model_choice == 'LSTM_FC':
         model = LSTM_FC(input_size, hidden_size,output_size, pred_steps,
