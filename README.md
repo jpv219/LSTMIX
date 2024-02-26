@@ -39,32 +39,66 @@ This script facilitates the evaluation of the trained model. It includes functio
 
 ```plaintext
 LSTMIX/
-│
-├── datagen.py
+│ 
+├── Clean_CSV.py
+│ 
+├── config/
+│   ├── config_paths.ini
+│   ├── config_sm.ini
+│   └── config_sv.ini
+│ 
+├── data_gen.py
+│ 
+├── figs/
+│   ├── input_data/
+│   ├── performance_logs/
+│   ├── perturbations/
+│   ├── rollouts/
+│   ├── split_data/
+│   ├── temporal_dist/
+│   ├── temporal_EMD/
+│   └── windowed/
+│ 
 ├── hyperparam_tuning.py
+│ 
+├── input_data/
+│   └── inputdata.pkl
+│ 
+├── input.py
+├── Load_Clean_DF.py
 ├── modeltrain_LSTM.py
+├── perturbation.py
 ├── rollout_prediction.py
 ├── README.md
 ├── requirements.txt
-├── figs/
-│   ├── input_data/
-│   ├── rollouts/
-│   ├── windowed/
-│   ├── split_data_temporal_EMD/
-│   └── temporal_dist/
-│
-├── input_data/
-│
+├── tools_modeltraining.py
+│ 
 ├── trained_models/
-│   ├── data_sets_DMS/
-│   └── data_sets_S2S/
-│
+│   ├── data_sets_GRU_ED/
+│   ├── data_sets_GRU_FC/
+│   ├── data_sets_LSTM_ED/
+│   ├── data_sets_LSTM_FC/
+│   ├── GRU_ED_logs/
+│   ├── GRU_ED_trained_model.pt
+│   ├── GRU_FC_logs/
+│   ├── GRU_FC_trained_model.pt
+│   ├── hyperparams_GRU_ED.txt
+│   ├── hyperparams_GRU_FC.txt
+│   ├── hyperparams_LSTM_ED.txt
+│   ├── hyperparams_LSTM_FC.txt
+│   ├── LSTM_ED_logs/
+│   ├── LSTM_ED_trained_model.pt
+│   ├── LSTM_FC_logs/
+│   └── LSTM_FC_trained_model.pt
+│ 
 ├── tuning/
-│   ├── best_models/
-│   ├── DMS/
-│   └── S2S/
+│   ├── best_models/
+│   ├── GRU_ED/
+│   ├── GRU_FC/
+│   ├── LSTM_ED/
+│   └── LSTM_FC/
 │
-└── RawData/  # Not part of the repository, user data
+└── RawData/ # Not part of the repository, user data
 
 ## Getting Started
 
