@@ -467,8 +467,8 @@ class Rollout(PathConfig):
             for axis in ['top', 'bottom', 'left', 'right']:
                 axes.spines[axis].set_linewidth(1.5)  # change width
                     
-        fig.tight_layout()
-        fig.savefig(os.path.join(self.fig_savepath, 'temporal_EMD',model_name,f'EMD_{model_name}_DSD_{t}.png'), dpi=150)
+            fig.tight_layout()
+            fig.savefig(os.path.join(self.fig_savepath, 'temporal_EMD',model_name,f'EMD_{model_name}_DSD_{t}.png'), dpi=150)
 
     # y_x error dispersion for training/validation
     def plot_y_x(self,model, model_name,set_labels, features,
@@ -784,18 +784,19 @@ def main():
     ## Load the last best model before training degrades         
     model.load_state_dict(torch.load(os.path.join(path.trainedmod_savepath,f'{model_choice}_trained_model.pt'),
                                      map_location=torch.device('cpu')))
+    
+    # Extracting train and validation arrays and tensors
+    X_train = windowed_tensors[0]
+    X_val = windowed_tensors[1]
+    train_arr = arrays[0]
+    val_arr = arrays[1]
+    train_casebatch = casebatches[0]
+    val_casebatch = casebatches[1]
 
     ## plot final training state from train and validation data
     pred_choice = input('plot predicted training and val data? (y/n) :')
 
     if pred_choice.lower() == 'y' or pred_choice.lower() == 'yes':
-
-        X_train = windowed_tensors[0]
-        X_val = windowed_tensors[1]
-        train_arr = arrays[0]
-        val_arr = arrays[1]
-        train_casebatch = casebatches[0]
-        val_casebatch = casebatches[1]
 
         features = ['ND', 'IA']
         if X_train.shape[-1] == 2:
@@ -812,45 +813,34 @@ def main():
         
     
     ## Plotting pred. vs. true data dispersion in y=x plot
-    xy_choice = input('plot x=y fit curve for train and validation together? (y/n) :')
+    xy_choice = input('plot x=y fit curve for train and validation? (y/n) :')
 
     if xy_choice.lower() == 'y' or xy_choice.lower() == 'yes':
 
-        X_train = windowed_tensors[0]
-        X_val = windowed_tensors[1]
-        train_arr = arrays[0]
-        val_arr = arrays[1]
-        train_casebatch = casebatches[0]
-        val_casebatch = casebatches[1]
+        xy_choice_2 = input('plot them together? (y/n) :')
 
-        ## Combining both train and val tensors, true arrays, casebatch arrays and labels to generate a single y=x plot
-        X_window_stack = torch.cat((X_train,X_val),dim=0)
-        true_data_stack = np.concatenate((train_arr,val_arr),axis = 1)
+        if xy_choice_2.lower() == 'y' or xy_choice_2.lower() == 'yes':
 
-        ## Correcting the val_casebatch to continue the sequence from the train_casebatch, capturing the correct number of concatenated windows in the train/val tensors
-        val_batch_corr = np.array([x + train_casebatch[-1] for x in val_casebatch])
-        X_casebatch_stack = np.concatenate((train_casebatch,val_batch_corr),axis = 0)
+            ## Combining both train and val tensors, true arrays, casebatch arrays and labels to generate a single y=x plot
+            X_window_stack = torch.cat((X_train,X_val),dim=0)
+            true_data_stack = np.concatenate((train_arr,val_arr),axis = 1)
 
-        X_setlabels_stack = splitset_labels[0] + splitset_labels[1]
+            ## Correcting the val_casebatch to continue the sequence from the train_casebatch, capturing the correct number of concatenated windows in the train/val tensors
+            val_batch_corr = np.array([x + train_casebatch[-1] for x in val_casebatch])
+            X_casebatch_stack = np.concatenate((train_casebatch,val_batch_corr),axis = 0)
 
-        rollout.plot_y_x(model,model_choice,X_setlabels_stack,features,X_window_stack,
-                 true_data_stack,X_casebatch_stack)
+            X_setlabels_stack = splitset_labels[0] + splitset_labels[1]
+
+            rollout.plot_y_x(model,model_choice,X_setlabels_stack,features,X_window_stack,
+                    true_data_stack,X_casebatch_stack)
     
-    else:
+        else:
 
-        X_train = windowed_tensors[0]
-        X_val = windowed_tensors[1]
-        train_arr = arrays[0]
-        val_arr = arrays[1]
-        train_casebatch = casebatches[0]
-        val_casebatch = casebatches[1]
-
-        rollout.plot_y_x(model,model_choice,splitset_labels[0],features,X_train,
-                 train_arr,train_casebatch,type='train')
-        
-        rollout.plot_y_x(model,model_choice,splitset_labels[1],features,X_val,
-                 val_arr,val_casebatch,type='val')
-
+            rollout.plot_y_x(model,model_choice,splitset_labels[0],features,X_train,
+                    train_arr,train_casebatch,type='train')
+            
+            rollout.plot_y_x(model,model_choice,splitset_labels[1],features,X_val,
+                    val_arr,val_casebatch,type='val')
 
     ## carry out rollout predictions on testing data sets
     test_arr = arrays[2]
