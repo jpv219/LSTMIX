@@ -8,3 +8,5 @@ __pycache__/
 *.txt
 *.png
 *_fy*
+LSTM_MTM/figs/
+LSTM_MTM/input_data/

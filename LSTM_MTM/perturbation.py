@@ -55,8 +55,9 @@ class PathConfig:
 
     def __init__(self):
         self._config = configparser.ConfigParser()
-        self._config.read(os.path.join(os.getcwd(), 'config/config_paths.ini'))
-    
+        package_dir = os.path.dirname(os.path.abspath(__file__)) # by tracing the file directory
+        self._config.read(os.path.join(package_dir, 'config/config_paths.ini'))
+        
     @property
     def trainedmod_savepath(self):
         return self._config['Path']['training']

@@ -64,7 +64,8 @@ class PathConfig:
 
     def __init__(self):
         self._config = configparser.ConfigParser()
-        self._config.read(os.path.join(os.getcwd(), 'config/config_paths.ini'))
+        package_dir = os.path.dirname(os.path.abspath(__file__)) # by tracing the file directory
+        self._config.read(os.path.join(package_dir, 'config/config_paths.ini'))
 
     @property
     def fig_savepath(self):
@@ -283,8 +284,16 @@ class Rollout(PathConfig):
     # Plot rollout predictions from the LSTM for all trained features
     def plot_rollout_pred(self,rollout_seq, true_data, features,set_labels, model_name):
 
-        cmap = sns.color_palette('RdBu',len(set_labels)*4)
-        colors = cmap[::4][:len(set_labels)]
+        cmap = sns.color_palette('RdBu',n_colors=256)
+
+        # Splitting Rd and Bl scales
+        white_idx = int(len(cmap)/2) # midway
+        split_idx = int(len(cmap)*0.1)
+        palette = cmap[:white_idx - split_idx] + cmap[white_idx+split_idx:]
+
+        # Color palette step
+        n_colors = int(len(palette)/len(set_labels))
+        colors = palette[::n_colors]
 
         num_features = len(features)
 
@@ -390,8 +399,16 @@ class Rollout(PathConfig):
     # Plot DSD rollout predictions as histograms along time
     def plot_rollout_dist(self,rollout_seq, true_data, set_labels, bin_edges, model_name):
 
-        cmap = sns.color_palette('RdBu', len(set_labels)*4)
-        colors = cmap[::4][:len(set_labels)]
+        cmap = sns.color_palette('RdBu',n_colors=256)
+
+        # Splitting Rd and Bl scales
+        white_idx = int(len(cmap)/2) # midway
+        split_idx = int(len(cmap)*0.1)
+        palette = cmap[:white_idx - split_idx] + cmap[white_idx+split_idx:]
+
+        # Color palette step
+        n_colors = int(len(palette)/len(set_labels))
+        colors = palette[::n_colors]
 
         # comparison of temporal distributions
         for t in range(self.steps_in, true_data.shape[0]):
@@ -429,8 +446,16 @@ class Rollout(PathConfig):
     # Wasserstain distance 
     def plot_EMD(self,rollout_seq, true_data, set_labels, bin_edges, model_name):
 
-        cmap = sns.color_palette('RdBu', len(set_labels)*4)
-        colors = cmap[::4][:len(set_labels)]
+        cmap = sns.color_palette('RdBu',n_colors=256)
+
+        # Splitting Rd and Bl scales
+        white_idx = int(len(cmap)/2) # midway
+        split_idx = int(len(cmap)*0.1)
+        palette = cmap[:white_idx - split_idx] + cmap[white_idx+split_idx:]
+
+        # Color palette step
+        n_colors = int(len(palette)/len(set_labels))
+        colors = palette[::n_colors]
 
         fig, axes = plt.subplots(figsize=(10,8))
         fig.tight_layout(rect=[0,0,1,0.95])
