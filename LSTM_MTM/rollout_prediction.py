@@ -17,6 +17,7 @@ from sklearn.metrics import r2_score
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from matplotlib.ticker import FormatStrFormatter 
 from scipy.stats import wasserstein_distance
+from scipy.special import kl_div
 import time
 import tracemalloc
 from memory_profiler import profile
@@ -444,7 +445,7 @@ class Rollout(PathConfig):
             fig.savefig(os.path.join(self.fig_savepath, 'temporal_dist',model_name,f'Rollout_{model_name}_DSD_{t}.png'), dpi=150)
             #plt.show()
 
-    # Wasserstain distance 
+    # Wasserstein distance 
     def plot_EMD(self,rollout_seq, true_data, set_labels, bin_edges, model_name):
 
         cmap = sns.color_palette('RdBu',n_colors=256)
@@ -458,43 +459,92 @@ class Rollout(PathConfig):
         n_colors = int(len(palette)/len(set_labels))
         colors = palette[::n_colors]
 
-        fig, axes = plt.subplots(figsize=(10,8))
-        fig.tight_layout(rect=[0,0,1,0.95])
-        fig.subplots_adjust(hspace=0.3)
-
+        emd_data = {case: [] for case in set_labels}
             
-        for seq,case in enumerate(set_labels):
-            plot_label = fine_labels.get(case,case)
-
-            emds=[]
+        for t in range(self.steps_in,true_data.shape[0]):
             
-            for t in range(self.steps_in,true_data.shape[0]):
-                t_label = t#(t+320)/32
-                
-                ## Wasserstain
+            plt.figure(figsize=(10,8))
+            plt.tight_layout(rect=[0,0,1,0.95])
+            t_label = t#(t+320)/32
+        
+            for seq,case in enumerate(set_labels):
+
+                plot_label = fine_labels.get(case,case)
+
+                ## Wasserstein
                 try:
                     emd = wasserstein_distance(bin_edges, bin_edges, true_data[t,seq,2:], rollout_seq[seq,t,2:])
                 except:
-                    emd=-0.1
+                    emd=-0.05
+                
+                emd_data[case].append(emd)
 
-                emds.append(emd)
+                plt.scatter(range(self.steps_in,t_label+1), emd_data[case],color = colors[seq % len(colors)],label=f'{plot_label}')
+                plt.xlim([40,100])
+                plt.ylim([0,1])
+                plt.ylabel('Wasserstein distance',fontweight='bold',fontsize=30)
+                plt.xlabel(r'Time steps',fontweight='bold',fontsize=30)
+                plt.tick_params(axis='both',labelsize=20)
+                plt.legend(title=f'{model_name}: {self.mixer}', title_fontsize=20,
+                                loc='upper right',fontsize=16,
+                                edgecolor='black', frameon=True)
 
-            axes.scatter(range(self.steps_in, true_data.shape[0]), emds,color = colors[seq % len(colors)],label=f'{plot_label}')
-            # axes.set_xlim([50,400])
-            axes.set_xlim([40,100])
-            axes.set_ylim([0,1])
-            axes.set_ylabel('Wasserstein distance',fontweight='bold',fontsize=30)
-            axes.set_xlabel(r'Time steps',fontweight='bold',fontsize=30)
-            axes.tick_params(axis='both',labelsize=20)
-            axes.legend(title=f'{model_name}: {self.mixer}', title_fontsize=20,
-                            loc='upper right',fontsize=16,
-                            edgecolor='black', frameon=True) 
+                for axis in ['top', 'bottom', 'left', 'right']:
+                    plt.gca().spines[axis].set_linewidth(1.5)  # change width
 
-            for axis in ['top', 'bottom', 'left', 'right']:
-                axes.spines[axis].set_linewidth(1.5)  # change width
-                    
-            fig.tight_layout()
-            fig.savefig(os.path.join(self.fig_savepath, 'temporal_EMD',model_name,f'EMD_{model_name}_DSD_{t}.png'), dpi=150)
+                        
+            plt.tight_layout()
+            plt.savefig(os.path.join(self.fig_savepath, 'temporal_EMD',model_name,f'EMD_{model_name}_DSD_{t}.png'), dpi=150)
+
+    # KL divergence 
+    def plot_KL(self,rollout_seq, true_data, set_labels, model_name):
+
+        cmap = sns.color_palette('RdBu',n_colors=256)
+
+        # Splitting Rd and Bl scales
+        white_idx = int(len(cmap)/2) # midway
+        split_idx = int(len(cmap)*0.1)
+        palette = cmap[:white_idx - split_idx] + cmap[white_idx+split_idx:]
+
+        # Color palette step
+        n_colors = int(len(palette)/len(set_labels))
+        colors = palette[::n_colors]
+
+        kl_data = {case: [] for case in set_labels}
+            
+        for t in range(self.steps_in,true_data.shape[0]):
+            
+            plt.figure(figsize=(10,8))
+            plt.tight_layout(rect=[0,0,1,0.95])
+            t_label = t#(t+320)/32
+        
+            for seq,case in enumerate(set_labels):
+
+                plot_label = fine_labels.get(case,case)
+
+                ##KL DIV
+                try:
+                    kl = kl_div(np.array(rollout_seq[seq,t,2:]),np.array(true_data[t,seq,2:])).sum()
+                except:
+                    kl=-0.05
+                
+                kl_data[case].append(kl)
+
+                plt.scatter(range(self.steps_in,t_label+1), kl_data[case],color = colors[seq % len(colors)],label=f'{plot_label}')
+                plt.xlim([40,100])
+                plt.ylabel('K-L Divergence',fontweight='bold',fontsize=30)
+                plt.xlabel(r'Time steps',fontweight='bold',fontsize=30)
+                plt.tick_params(axis='both',labelsize=20)
+                plt.legend(title=f'{model_name}: {self.mixer}', title_fontsize=20,
+                                loc='upper right',fontsize=16,
+                                edgecolor='black', frameon=True)
+
+                for axis in ['top', 'bottom', 'left', 'right']:
+                    plt.gca().spines[axis].set_linewidth(1.5)  # change width
+
+                        
+            plt.tight_layout()
+            plt.savefig(os.path.join(self.fig_savepath, 'temporal_KL',model_name,f'KL_{model_name}_DSD_{t}.png'), dpi=150)
 
     # y_x error dispersion for training/validation
     def plot_y_x(self,model, model_name,set_labels, features,
@@ -938,8 +988,10 @@ def main():
         t_evol_choice = input('plot DSD temporal evolution and K-L/Wasserstein metrics? (y/n): ')
 
         if t_evol_choice.lower() == 'y':
-            rollout.plot_rollout_dist(rollout_seq,test_arr, splitset_labels[2], bin_edges, model_choice)
             rollout.plot_EMD(rollout_seq,test_arr, splitset_labels[2], bin_edges, model_choice)
+            rollout.plot_KL(rollout_seq,test_arr, splitset_labels[2], model_choice)
+            rollout.plot_rollout_dist(rollout_seq,test_arr, splitset_labels[2], bin_edges, model_choice)
+
 
     #Reporting code performance
     print(f'Total time consumed for {model} rollout predictions and plotting: {(time.time()-start_time)/60} min')
