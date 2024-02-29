@@ -97,8 +97,7 @@ class RawDataProcessing(PathConfig):
         elif os.path.isfile(file_name_vol):
             # If false, extract only volume array
             df_Vol = Load_Clean_DF.extract_Vol(case)
-            # Extarct the impeller frequency for sv for later truncation
-            f = int(case.split('_')[0][:-2])
+
         else:
             # Handle the case where neither file exists
             raise FileNotFoundError(f"Neither {file_name_gvol} nor {file_name_vol} found.")
@@ -109,10 +108,16 @@ class RawDataProcessing(PathConfig):
         
         # Truncate the dataset for sv cases:
         if mixer == 'sv':
-            if 'f' in locals():
+            
+            if os.path.isfile(file_name_vol):
+
+                # Extarct the impeller frequency for sv for later truncation
+                f = int(case.split('_')[0][:-2])
                 opt = 1/32/f
+
             else:
                 opt = 0.00625    
+
             df_Vol = df_Vol.loc[(round(df_Vol['Time']/opt) >= initial) & (round(df_Vol['Time']/opt) <= stop)]
             IntA = IntA.loc[(round(IntA['Time']/opt) >= initial) & (round(IntA['Time']/opt) <= stop)]
             Nd = df_Vol['Volume'].apply(lambda x: len(x))

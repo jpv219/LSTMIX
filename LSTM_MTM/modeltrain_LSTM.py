@@ -643,7 +643,7 @@ def mem_profile(model):
 
 ##################################### INPUT_DATA FUN. ################################################
 
-def input_data(Allcases, n_bins, leftmost, rightmost, feature_map,norm_columns,smoothing_method,smoothing_params):
+def input_data(Allcases, mixer_choice, n_bins, leftmost, rightmost, feature_map,norm_columns,smoothing_method,smoothing_params):
 
     #Path constructor
     path = PathConfig()
@@ -651,7 +651,7 @@ def input_data(Allcases, n_bins, leftmost, rightmost, feature_map,norm_columns,s
     DSD_columns = []
 
     ###### RAW DATA PROCESSING #####
-    ipt_rp = RawDataProcessing(Allcases)
+    ipt_rp = RawDataProcessing(Allcases,mixer_choice)
 
     ## post dict empty with case slots built in
     pre_dict,post_dict =ipt_rp.sort_inputdata()
@@ -1233,7 +1233,7 @@ def main():
                     }
         norm_columns = ['Number of drops', 'Interfacial Area']
 
-        input_data(Allcases,n_bins,leftmost, rightmost, feature_map,norm_columns,smoothing_method,smoothing_params)
+        input_data(Allcases,mixer_choice,n_bins,leftmost, rightmost, feature_map,norm_columns,smoothing_method,smoothing_params)
 
     # Reading saved re-shaped input data from file
     with open(os.path.join(path.input_savepath,'inputdata.pkl'), 'rb') as file:
