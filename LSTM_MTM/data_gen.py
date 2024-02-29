@@ -78,7 +78,7 @@ def main():
                     }
         norm_columns = ['Number of drops', 'Interfacial Area']
 
-        trn.input_data(Allcases,n_bins, leftmost, rightmost, feature_map,norm_columns,smoothing_method,smoothing_params)
+        trn.input_data(Allcases,mixer_choice,n_bins, leftmost, rightmost, feature_map,norm_columns,smoothing_method,smoothing_params)
 
     # Reading saved re-shaped input data from file
     with open(os.path.join(path.input_savepath,'inputdata.pkl'), 'rb') as file:
