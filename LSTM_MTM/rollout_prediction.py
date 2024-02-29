@@ -480,8 +480,8 @@ class Rollout(PathConfig):
                 emds.append(emd)
 
             axes.scatter(range(self.steps_in, true_data.shape[0]), emds,color = colors[seq % len(colors)],label=f'{plot_label}')
-            # axes.set_xlim([50,400])
-            axes.set_xlim([40,100])
+            axes.set_xlim([50,400])
+            # axes.set_xlim([40,100])
             axes.set_ylim([0,1])
             axes.set_ylabel('Wasserstein distance',fontweight='bold',fontsize=30)
             axes.set_xlabel(r'Time steps',fontweight='bold',fontsize=30)
@@ -938,7 +938,7 @@ def main():
         t_evol_choice = input('plot DSD temporal evolution and K-L/Wasserstein metrics? (y/n): ')
 
         if t_evol_choice.lower() == 'y':
-            rollout.plot_rollout_dist(rollout_seq,test_arr, splitset_labels[2], bin_edges, model_choice)
+            # rollout.plot_rollout_dist(rollout_seq,test_arr, splitset_labels[2], bin_edges, model_choice)
             rollout.plot_EMD(rollout_seq,test_arr, splitset_labels[2], bin_edges, model_choice)
 
     #Reporting code performance
