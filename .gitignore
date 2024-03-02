@@ -11,4 +11,4 @@ __pycache__/
 LSTM_MTM/figs/
 LSTM_MTM/input_data/
 LSTM_MTM/config/*
-*ini
+*.ini

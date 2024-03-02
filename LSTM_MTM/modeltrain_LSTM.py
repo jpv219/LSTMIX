@@ -89,6 +89,10 @@ class PathConfig:
     def trainedmod_savepath(self):
         return self._config['Path']['training']
     
+    @property
+    def config_path(self):
+        return self._config['Path']['config']
+    
 
 class Window_data(PathConfig):
 
@@ -814,6 +818,7 @@ def saving_data(wd,hp,model_choice,save_hp=True):
             "check_epochs": hp.check_epochs,
             "steps_in": hp.steps_in,
             "steps_out": hp.steps_out,
+            "training_prediction": hp.training_prediction,
             "tf_ratio": hp.tf_ratio,
             "dynamic_tf": hp.dynamic_tf,
             "penalty_weight": hp.penalty_weight,
@@ -1195,7 +1200,7 @@ def main():
     # Read the case-specific info from config file
     mixer_choice = input('Choose the mixing system you would like to pre-process (sm/sv): ')
     config = configparser.ConfigParser()
-    config.read(os.path.join(os.getcwd(),f'config/config_{mixer_choice}.ini'))
+    config.read(os.path.join(path.config_path,f'config_{mixer_choice}.ini'))
 
     ####### WINDOW DATA ########
 
@@ -1283,8 +1288,12 @@ def main():
         #Reading hyperparams from txt file saved during tuning procedure
         with open(hp_path) as file:
             for line in file:
-                key, value = line.strip().split(": ")  # Split each line into key and value
-                hyperparams[key] = eval(value)
+                key, value = line.strip().split(":")  # Split each line into key and value
+
+                if key.strip() == "training_prediction":
+                    hyperparams[key.strip()] = value.strip()
+                else:
+                    hyperparams[key.strip()] = ast.literal_eval(value.strip())
 
         input_size = hyperparams['input_size']
         hidden_size = hyperparams['hidden_size']
@@ -1292,6 +1301,7 @@ def main():
         pred_steps = hyperparams['pred_steps']
         batch_size = hyperparams['batch_size']
         learning_rate = hyperparams['learning_rate']
+        training_prediction = hyperparams['training_prediction']
         tf_ratio = hyperparams['tf_ratio']
         dynamic_tf = hyperparams['dynamic_tf']
         l1 = hyperparams['l1']
@@ -1314,6 +1324,7 @@ def main():
         learning_rate = 0.01
         penalty_weight = 0.1
 
+        training_prediction = 'mixed'
         tf_ratio = 0.4
         dynamic_tf = True
 
@@ -1378,7 +1389,7 @@ def main():
         
         train_ED_dec(model_choice, model,optimizer, loss_fn, trainloader, valloader, scheduler, num_epochs, 
                   check_epochs,pred_steps,X_train,y_train, X_val, y_val,
-                  tf_ratio, dynamic_tf, training_prediction= 'mixed',
+                  tf_ratio, dynamic_tf, training_prediction,
                   saveas=f'{model_choice}_out',batch_loss=False)
 
     else:
@@ -1390,13 +1401,13 @@ def main():
     HyperParams = namedtuple('HyperParams', [
     'input_size', 'hidden_size', 'output_size',
     'pred_steps', 'batch_size', 'learning_rate',
-    'num_epochs', 'check_epochs', 'steps_in', 'steps_out', 'tf_ratio', 'dynamic_tf','penalty_weight','l1','l2'
+    'num_epochs', 'check_epochs', 'steps_in', 'steps_out', 'training_prediction', 'tf_ratio', 'dynamic_tf','penalty_weight','l1','l2'
         ])
     
     hyper_params = HyperParams(input_size=input_size, hidden_size=hidden_size, output_size=output_size,
     pred_steps=pred_steps, batch_size=batch_size, learning_rate=learning_rate, num_epochs=num_epochs,
-    check_epochs=check_epochs, steps_in=steps_in, steps_out=steps_out, tf_ratio=tf_ratio, dynamic_tf=dynamic_tf, 
-    penalty_weight=penalty_weight,l1=l1, l2=l2)
+    check_epochs=check_epochs, steps_in=steps_in, steps_out=steps_out, training_prediction=training_prediction, 
+    tf_ratio=tf_ratio, dynamic_tf=dynamic_tf,penalty_weight=penalty_weight,l1=l1, l2=l2)
 
     saving_data(windowed_data,hyper_params,model_choice)
 

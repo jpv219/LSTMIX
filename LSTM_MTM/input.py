@@ -75,6 +75,10 @@ class PathConfig:
     @property
     def raw_datapath(self):
         return self._config['Path']['raw_data']
+    
+    @property
+    def config_path(self):
+        return self._config['Path']['config']
 
 class RawDataProcessing(PathConfig):
 
@@ -559,7 +563,7 @@ def main():
     mixer_choice = input('Choose the mixing system you would like to pre-process (sm/sv): ')
 
     config = configparser.ConfigParser()
-    config.read(os.path.join(os.getcwd(),f'config/config_{mixer_choice}.ini'))
+    config.read(os.path.join(path.config_path,f'config_{mixer_choice}.ini'))
 
     Allcases = ast.literal_eval(config.get('Cases', 'cases'))
 

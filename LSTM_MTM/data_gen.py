@@ -29,6 +29,10 @@ class PathConfig:
     def trainedmod_savepath(self):
         return self._config['Path']['training']
     
+    @property
+    def config_path(self):
+        return self._config['Path']['config']
+    
 
 
 ########################################### MAIN ###########################################
@@ -41,7 +45,7 @@ def main():
     # Read the case-specific info from config file
     mixer_choice = input('Choose the mixing system you would like to pre-process (sm/sv): ')
     config = configparser.ConfigParser()
-    config.read(os.path.join(os.getcwd(),f'config/config_{mixer_choice}.ini'))
+    config.read(os.path.join(path.config_path,f'config_{mixer_choice}.ini'))
 
     ####### WINDOW DATA ########
 

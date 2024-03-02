@@ -249,6 +249,7 @@ def further_train(model_choice, init_training, X_tens, y_tens, best_trial,best_c
         "check_epochs": init_training['check_epochs'],
         "steps_in": init_training['steps_in'],
         "steps_out": init_training['steps_out'],
+        "training_prediction": config_training["training_prediction"],
         "tf_ratio": config_training['tf_ratio'],
         "dynamic_tf": config_training['dynamic_tf'],
         "penalty_weight": config_training['penalty_weight'],
