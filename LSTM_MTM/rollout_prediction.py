@@ -299,9 +299,20 @@ class Rollout(PathConfig):
 
         num_features = len(features)
 
+        # Creating a dictionary to store r2 values for all features per case
+        r2_dict = {case: {feature:{} for feature in features} for case in set_labels}
+        r2_feat = {feature: {} for feature in features}
+
+        # Reshaping rollout_seq to calcualte R2 per feature
+        rollout_seq_reshaped = rollout_seq.permute(1,0,2) # new features as [times,cases,features]
+        rollout_seq_sliced = rollout_seq_reshaped[:true_data.shape[0]] #slicing to match timesteps in true data
+
         # Loop over features: Nd, IA
         for f_idx in range(0,2):
             fig = plt.figure(figsize=(12,7))
+
+            #R2 score per feature
+            r2_feat[features[f_idx]] = r2_score(true_data[:,:,f_idx],rollout_seq_sliced[:,:,f_idx])
 
             # looping through cases
             for i, case in enumerate(set_labels):
@@ -311,8 +322,8 @@ class Rollout(PathConfig):
                 ## truedata shaped as (timesteps, cases, features) and rollout as (case,timestep,features)
                 r2 = r2_score(true_data[:,i,f_idx],rollout_seq[i,:,f_idx][:true_data.shape[0]])
 
-                with open(os.path.join(self.fig_savepath,'rollouts',f'{model_name}','R^2.txt'),'w') as file:
-                    print(f' R2 {case}, {y_label}: {r2}', file = file)
+                ## Append each r2 per case/feature loop
+                r2_dict[case][features[f_idx]] = r2
 
                 p = plt.plot(true_data[:,i,f_idx], label=f'{plot_label}',color = colors[i % len(colors)],linewidth = 4)
 
@@ -345,26 +356,27 @@ class Rollout(PathConfig):
 
             fig.savefig(os.path.join(self.fig_savepath,'rollouts',f'{model_name}', f'Rollout_{model_name}_{features[f_idx]}.png'))
             plt.show()
-        
+
         if num_features > 2:
             # Loop over features: drop size range
             bin_idxs = 8 #num_features - 2
             fig2,axes2 = plt.subplots(1,int(bin_idxs/2), figsize=(int(bin_idxs/2*5),5))
 
             for f, f_idx in enumerate([4,6,7,9]):#range(2, num_features):
+                
+                #R2 score per feature
+                r2_feat[features[f_idx]] = r2_score(true_data[:,:,f_idx],rollout_seq_sliced[:,:,f_idx])
+                
                 # looping through cases
                 for i, case in enumerate(set_labels):
-                    title_label = feature_labels.get(features[f_idx],features[f_idx])
                     plot_label = fine_labels.get(case,case)
-                    row = int(f_idx-2) // int(bin_idxs/2)  # Calculate the row for the subplot
-                    col = int(f_idx-2) % int(bin_idxs/2)  # Calculate the column for the subplot
                     ax = axes2[f] #[row, col]
                 
                     ## truedata shaped as (timesteps, cases, features) and rollout as (case,timestep,features)
                     r2 = r2_score(true_data[:,i,f_idx],rollout_seq[i,:,f_idx][:true_data.shape[0]])
 
-                    with open(os.path.join(self.fig_savepath,'rollouts',f'{model_name}','R^2.txt'),'w') as file:
-                        print(f' R2 {case}, {y_label}: {r2}', file = file)
+                    ## Append each r2 per case/feature loop
+                    r2_dict[case][features[f_idx]] = r2
 
                     p = ax.plot(true_data[:,i,f_idx], label=f'Target {plot_label}',color = colors[i % len(colors)],linewidth = 3)
 
@@ -397,6 +409,20 @@ class Rollout(PathConfig):
 
             fig2.savefig(os.path.join(self.fig_savepath,'rollouts',f'{model_name}', f'Rollout_{model_name}_DSD.png'), dpi=150)
             plt.show()
+
+        # Save stored R2 values per case and feature into a txt file
+        with open(os.path.join(self.fig_savepath,'rollouts',f'{model_name}','R^2_case.txt'),'w') as file:
+
+            # features is the list of all features, which has to be looped again to access the actual nested key
+            for case,features in r2_dict.items():
+                for feature in features:
+                    print(f'R^2 score for feature {feature} in case {case}: {r2_dict[case][feature]}', file = file)
+
+        # Save stored R2 values per feature into a txt file
+        with open(os.path.join(self.fig_savepath,'rollouts',f'{model_name}','R^2_features.txt'),'w') as file:
+
+            for feature in r2_feat.keys():
+                print(f'R^2 overall score for feature {feature}: {r2_feat[feature]}', file = file)
 
     # Plot DSD rollout predictions as histograms along time
     def plot_rollout_dist(self,rollout_seq, true_data, set_labels, bin_edges, model_name):
@@ -685,6 +711,8 @@ class Rollout(PathConfig):
 
         ground_truth = []
         predictions = []
+
+        r2_feat = {feature: {} for feature in features}
         
         ## change palette if training yx for the train and validation cases
         if train_val == 'train' or train_val == 'val':
@@ -723,8 +751,23 @@ class Rollout(PathConfig):
         r2 = r2_score(cat_truth, cat_pred)
 
         if train_val == 'train' or train_val == 'val':
+        
+            # Reshaping rollout_seq to calcualte R2 per feature
+            rollout_seq_reshaped = rollout_seq.permute(1,0,2) # new features as [times,cases,features]
+            rollout_seq_sliced = rollout_seq_reshaped[self.steps_in:len(true_data)] #slicing to match timesteps in true data
+            
+            # R2 per feature for training and validation cases processed
+            for f_idx in range(num_features):
+                r2_feat[features[f_idx]] = r2_score(true_data[self.steps_in:,:,f_idx],rollout_seq_sliced[:,:,f_idx])
+
+            with open(os.path.join(self.fig_savepath,'rollouts',model_name,f'R^2_features_{train_val}.txt'),'w') as file:
+                for feature in r2_feat.keys():
+                    print(f'R^2 overall score for feature {feature}: {r2_feat[feature]}', file = file)
+
+            #setting for txt files and plots
             set = train_val
             col = 'r'
+
         else:
             set = 'test'
             col = 'b'
@@ -880,6 +923,7 @@ def main():
 
     if pred_choice.lower() == 'y' or pred_choice.lower() == 'yes':
 
+        # Renaming feature names from the imported ones in the pkl file
         features = ['ND', 'IA']
         if X_train.shape[-1] == 2:
             features = features

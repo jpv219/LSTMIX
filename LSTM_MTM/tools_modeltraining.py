@@ -15,7 +15,8 @@ import configparser
 ## Setting up paths globally
 
 config_paths = configparser.ConfigParser()
-config_paths.read(os.path.join(os.getcwd(),'config/config_paths.ini'))
+package_dir = os.path.dirname(os.path.abspath(__file__))
+config_paths.read(os.path.join(package_dir, 'config/config_paths.ini'))
 
 trainedmod_savepath = config_paths['Path']['training']
 
