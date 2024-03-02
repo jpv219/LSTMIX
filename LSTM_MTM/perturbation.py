@@ -15,10 +15,8 @@ import seaborn as sns
 from modeltrain_LSTM import LSTM_FC, LSTM_ED, GRU_FC, GRU_ED
 from rollout_prediction import Rollout,PathConfig
 import numpy as np
-from sklearn.metrics import r2_score
 from contextlib import redirect_stdout
 import io
-import configparser
 
 ## Plot setup
 
