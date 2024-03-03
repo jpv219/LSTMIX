@@ -23,6 +23,7 @@ import tracemalloc
 from memory_profiler import profile
 import sys
 import configparser
+import ast
 
 ## Plot setup
 
@@ -856,9 +857,13 @@ def main():
     
     ## Hyperparameter loading
     with open(os.path.join(path.trainedmod_savepath,f'hyperparams_{model_choice}.txt'), "r") as file:
-        for line in file:
-            key, value = line.strip().split(": ")  # Split each line into key and value
-            hyperparams[key] = eval(value)
+            for line in file:
+                key, value = line.strip().split(":")  # Split each line into key and value
+
+                if key.strip() == "training_prediction":
+                    hyperparams[key.strip()] = value.strip()
+                else:
+                    hyperparams[key.strip()] = ast.literal_eval(value.strip())
 
     ##Renaming recurrent hyperparameters for legibility
     input_size = hyperparams["input_size"]
