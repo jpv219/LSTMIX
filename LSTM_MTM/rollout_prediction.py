@@ -673,7 +673,7 @@ class Rollout(PathConfig):
         mse = torch.mean((cat_truth-cat_pred)**2).item()
         r2 = r2_score(cat_truth, cat_pred)
 
-        with open(os.path.join(self.fig_savepath,'windowed',f'{model_name}','yx_R^2.txt'),'w') as file:
+        with open(os.path.join(self.fig_savepath,'windowed',f'{model_name}',f'yx_{type}_R^2.txt'),'w') as file:
             print(f"Mean Squared Error for the {type} dataset using {model_name}: {mse}", file=file)
             print(f"R^2 for the {type} dataset using {model_name}: {r2}", file=file)
 
@@ -774,7 +774,7 @@ class Rollout(PathConfig):
             col = 'b'
 
         
-        with open(os.path.join(self.fig_savepath,'rollouts',f'{model_name}','yx_roll_R^2.txt'),'w') as file:
+        with open(os.path.join(self.fig_savepath,'rollouts',f'{model_name}',f'yx_roll_{set}_R^2.txt'),'w') as file:
             print(f"MSE for the {set} dataset using {model_name}: {mse}", file=file)
             print(f"MAE for the {set} dataset using {model_name}: {mae}", file=file)
             print(f"RMSE for the {set} dataset using {model_name}: {rmse}", file=file)
