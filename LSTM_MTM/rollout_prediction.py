@@ -550,10 +550,7 @@ class Rollout(PathConfig):
                 plot_label = fine_labels.get(case,case)
 
                 ##KL DIV
-                try:
-                    kl = kl_div(np.array(rollout_seq[seq,t,2:]),np.array(true_data[t,seq,2:])).sum()
-                except:
-                    kl=-0.05
+                kl = kl_div(np.array(rollout_seq[seq,t,2:]),np.array(true_data[t,seq,2:])).sum()
                 
                 kl_data[case].append(kl)
 
@@ -1037,9 +1034,9 @@ def main():
         t_evol_choice = input('plot DSD temporal evolution and K-L/Wasserstein metrics? (y/n): ')
 
         if t_evol_choice.lower() == 'y':
-            rollout.plot_EMD(rollout_seq,test_arr, splitset_labels[2], bin_edges, model_choice)
+            # rollout.plot_EMD(rollout_seq,test_arr, splitset_labels[2], bin_edges, model_choice)
             rollout.plot_KL(rollout_seq,test_arr, splitset_labels[2], model_choice)
-            rollout.plot_rollout_dist(rollout_seq,test_arr, splitset_labels[2], bin_edges, model_choice)
+            # rollout.plot_rollout_dist(rollout_seq,test_arr, splitset_labels[2], bin_edges, model_choice)
 
 
     #Reporting code performance
