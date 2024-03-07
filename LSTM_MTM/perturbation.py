@@ -17,6 +17,7 @@ from rollout_prediction import Rollout,PathConfig
 import numpy as np
 from contextlib import redirect_stdout
 import io
+import ast
 
 ## Plot setup
 
@@ -225,7 +226,7 @@ class Perturbation(Rollout):
 
         ax[0].legend(title=f'{model_name}: {self.mixer}', title_fontsize=20, fontsize=18,edgecolor='black', frameon=True)
 
-        fig.supxlabel('Time step',fontsize=30)
+        fig.supxlabel('Time steps',fontsize=35)
         fig.tight_layout()
         fig.savefig(os.path.join(os.path.join(path.fig_savepath,'perturbations',model_name), f'Residuals_{model_name}.png'), dpi=150)
         plt.show()
@@ -234,8 +235,6 @@ def main():
     
     #Path constructor
     path = PathConfig()
-    
-    features = ['Number of drops', 'Interfacial Area']
 
     ## Selection of Neural net architecture and RNN unit type
     mixer_choice = input('UQ for which mixer? (sv,sm): ')
@@ -262,9 +261,13 @@ def main():
     
     ## Hyperparameter loading
     with open(os.path.join(path.trainedmod_savepath,f'hyperparams_{model_choice}.txt'), "r") as file:
-        for line in file:
-            key, value = line.strip().split(": ")  # Split each line into key and value
-            hyperparams[key] = eval(value)
+            for line in file:
+                key, value = line.strip().split(":")  # Split each line into key and value
+
+                if key.strip() == "training_prediction":
+                    hyperparams[key.strip()] = value.strip()
+                else:
+                    hyperparams[key.strip()] = ast.literal_eval(value.strip())
 
     ##Renaming recurrent hyperparameters for legibility
     input_size = hyperparams["input_size"]
@@ -318,15 +321,23 @@ def main():
 
 
     ## Load the last saved best model         
-    model.load_state_dict(torch.load(os.path.join(path.trainedmod_savepath,f'{model_choice}_trained_model.pt')))
+    model.load_state_dict(torch.load(os.path.join(path.trainedmod_savepath,f'{model_choice}_trained_model.pt'),
+                          map_location=torch.device('cpu')))
 
     ## Extract testing dataset
     test_arr = arrays[2]
 
+    features = ['ND', 'IA']
+    if test_arr.shape[-1] == 2:
+        features = features
+    elif test_arr.shape[-1] > 2:
+        for i in range(2, test_arr.shape[-1]):
+                features.append(f'Range {i-1}')
+
     ## Extracting input steps from test data, keeping all cases and features in shape (in_steps,cases,features)
     c_idx = 1 # test case index for uncertainty estimation
     input_seq = test_arr[:steps_in,c_idx:(c_idx+1),:]
-    case_label = splitset_labels[2][c_idx]
+
     
 
     # Total steps to predict
