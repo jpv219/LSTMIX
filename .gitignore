@@ -10,5 +10,5 @@ __pycache__/
 *_fy*
 LSTM_MTM/figs/
 LSTM_MTM/input_data/
-LSTM_MTM/config/*
+**/LSTM_MTM/config/*
 *.ini
