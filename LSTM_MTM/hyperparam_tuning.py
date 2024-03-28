@@ -302,8 +302,8 @@ def main():
             'training_prediction': tune.choice(['none']),
             'tf_ratio': tune.choice([0]),
             'dynamic_tf': tune.choice(['False']),
-            'l1_lambda': tune.choice([0, 0.00001,0.0001]),
-            'l2_lambda': tune.choice([0, 0.00001,0.0001]),
+            'l1_lambda': tune.choice([0, 0.00001]),
+            'l2_lambda': tune.choice([0, 0.00001]),
             'batch_loss': tune.choice(['False']),
             'penalty_weight': tune.choice([0.01,0.1,1,10])
         },
@@ -311,9 +311,9 @@ def main():
             'hidden_size': tune.choice([2 ** i for i in range(6, 9)]),
             'learning_rate': tune.choice([0.002,0.005]),
             'batch_size': tune.choice(range(8, 44, 4)),
-            'training_prediction': tune.choice(['recursive','teacher_forcing', 'mixed']),
-            'tf_ratio': tune.choice([0.02,0.1]),
-            'dynamic_tf': tune.choice(['True','False']),
+            'training_prediction': tune.choice(['teacher_forcing', 'mixed']),
+            'tf_ratio': tune.choice([0.02,0.1,0.2,0.4]),
+            'dynamic_tf': tune.choice(['True']),
             'l1_lambda': tune.choice([0,0.00001]),
             'l2_lambda': tune.choice([0,0.00001]),
             'batch_loss': tune.choice(['False']),
@@ -327,8 +327,8 @@ def main():
     init = {
         "input_size": X_tens[0].shape[-1],
         "output_size": y_tens[0].shape[-1],
-        "pred_steps": 50,
-        "num_epochs": 120,
+        "pred_steps": 30,
+        "num_epochs": 150,
         "check_epochs": 30
     }
 
@@ -343,7 +343,7 @@ def main():
 
     ray.shutdown()
     ray.init(num_cpus=num_cpus_to_allocate)
-    num_samples = 1000
+    num_samples = 1296
     log_file_path = os.path.join(path.tuningmod_savepath,model_choice,f'logs/{model_choice}_tune_out.log')
 
     #Decorate the tuner
@@ -384,16 +384,16 @@ def main():
         init_training = {
             "input_size": X_tens[0].shape[-1],
             "output_size": y_tens[0].shape[-1],
-            "pred_steps": 50,
+            "pred_steps": 30,
             "num_epochs": 3000,
             "check_epochs": 100,
-            "steps_in": 50,
-            "steps_out": 50
+            "steps_in": 40,
+            "steps_out": 30
     }
         
         further_train(model_choice,init_training,X_tens,y_tens,best_trial,best_chkpoint)
 
-    performance_file_path = os.path.join(path.tuningmod_savepath,model_choice,f'logs/{model_choice}_resources_out.log')
+    performance_file_path = os.path.join(path.tuningmod_savepath,model_choice,f'logs/{model_choice}_resources_out.txt')
     
     #Reporting code performance
     time_out = f'Total time consumed for {model_choice} hyperparameter tuning and further training: {(time.time()-start_time)/60} min'

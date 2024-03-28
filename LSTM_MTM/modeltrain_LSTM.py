@@ -1330,7 +1330,7 @@ def main():
 
         # Regularization l1,l2
         l1 = 0
-        l2 = 0
+        l2 = 1e-5
 
     num_epochs = 3000
     check_epochs = 100
