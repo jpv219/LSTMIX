@@ -229,7 +229,7 @@ class Rollout(PathConfig):
             ax.grid(color='k', linestyle=':', linewidth=0.1)
             ax.tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', length=5, width=1.5)
 
-            fig.savefig(os.path.join(self.fig_savepath,'windowed',f'{model_name}', f'Pred_{model_name}_{features[f_idx]}_{set}_set.png'), dpi=150)
+            fig.savefig(os.path.join(self.fig_savepath,'windowed',f'{model_name}', f'Pred_{model_name}_{features[f_idx]}_{set}_set.png'), dpi=200)
             plt.show()
 
         ## DSD Plotting if training data contains more features
@@ -281,7 +281,7 @@ class Rollout(PathConfig):
             fig2.supxlabel('Time steps',fontsize=30)
             fig2.supylabel('PD per DSD bin',fontsize=30)
             fig2.suptitle(f'Prediction with {model_name} for DSD {set} set',fontsize=40)
-            fig2.savefig(os.path.join(self.fig_savepath, 'windowed',f'{model_name}',f'Predall_{model_name}_DSD_{set}_set.png'), dpi=150)
+            fig2.savefig(os.path.join(self.fig_savepath, 'windowed',f'{model_name}',f'Predall_{model_name}_DSD_{set}_set.png'), dpi=200)
             plt.show()
 
     # Plot rollout predictions from the LSTM for all trained features
@@ -330,7 +330,7 @@ class Rollout(PathConfig):
 
                 # plotting rollout predictions from input steps until length of true data. Rolloutseq has shape (cases,timesteps,features)
                 plt.plot(range(self.steps_in,len(true_data)),rollout_seq[i,self.steps_in:len(true_data),f_idx],'o',markersize=8, # plotting interval after input steps until true data ends
-                        markerfacecolor=p[0].get_color(),alpha=0.8,markeredgewidth=1.5, markeredgecolor='k',markevery=3,
+                        markerfacecolor=p[0].get_color(),alpha=0.8,markeredgewidth=1.5, markeredgecolor='k',markevery=3,#8
                         lw=0.0, label=f'{plot_label}')
                 ax = plt.gca()
 
@@ -338,13 +338,13 @@ class Rollout(PathConfig):
                 for axis in ['top', 'bottom', 'left', 'right']:
                     ax.spines[axis].set_linewidth(1.5)  # change width
             
-            plt.legend()
+            # plt.legend()
             if f_idx == 0:
                 h,l = [a for a in ax.get_legend_handles_labels()]
                 plt.legend(title= self.mixer, title_fontsize=30,
                         handles=zip(h[::2],h[1::2]), labels=l[::2], # ::2 every two elements
                         handler_map = {tuple: mpl.legend_handler.HandlerTuple(None)},
-                        loc='upper left',fontsize=25,
+                        fontsize=25,#loc='upper left',
                         edgecolor='black', frameon=True)
             
             plt.xlabel('Time steps',fontsize=40,fontdict=dict(weight='bold'))
@@ -370,6 +370,7 @@ class Rollout(PathConfig):
                 
                 # looping through cases
                 for i, case in enumerate(set_labels):
+                    title_label = feature_labels.get(features[f_idx],features[f_idx])
                     plot_label = fine_labels.get(case,case)
                     ax = axes2[f] #[row, col]
                 
@@ -379,11 +380,11 @@ class Rollout(PathConfig):
                     ## Append each r2 per case/feature loop
                     r2_dict[case][features[f_idx]] = r2
 
-                    p = ax.plot(true_data[:,i,f_idx], label=f'Target {plot_label}',color = colors[i % len(colors)],linewidth = 3)
+                    p = ax.plot(true_data[:,i,f_idx], label=f'{plot_label}',color = colors[i % len(colors)],linewidth = 3)
 
                     # plotting rollout predictions from input steps until length of true data. Rolloutseq has shape (cases,timesteps,features)
-                    ax.plot(range(self.steps_in,len(true_data)),rollout_seq[i,self.steps_in:len(true_data),f_idx],'s',markersize=5, # plotting interval after input steps until true data ends
-                            markerfacecolor=p[0].get_color(),alpha=0.8,markeredgewidth=1.5, markeredgecolor='k', markevery=3,
+                    ax.plot(range(self.steps_in,len(true_data)),rollout_seq[i,self.steps_in:len(true_data),f_idx],'o',markersize=5, # plotting interval after input steps until true data ends
+                            markerfacecolor=p[0].get_color(),alpha=0.8,markeredgewidth=1.5, markeredgecolor='k', markevery=3,#8
                             lw=0.0, label=f'{plot_label}')
                     
                     plt.setp(ax.spines.values(),linewidth = 1.5)
@@ -396,11 +397,13 @@ class Rollout(PathConfig):
                         handler_map = {tuple: mpl.legend_handler.HandlerTuple(None)},
                         loc='upper right',fontsize=14,
                         edgecolor='black', frameon=True)
-                ax.set_title(f'{features[f_idx]}', fontsize=25, pad=15)
-                # ax.set_xticks([0,100,200,300,400]) # sv settings
-                ax.set_xticks([0,25,50,75,100])
+                ax.set_title(f'{title_label}', fontsize=25, pad=15)
+                if self.mixer == 'Stirred Mixer':
+                    ax.set_xticks([0,100,200,300,400]) # sv settings
+                else:
+                    ax.set_xticks([0,25,50,75,100])
                 ax.xaxis.set_major_formatter(FormatStrFormatter('%.f'))
-                ax.grid(color='k', linestyle=':', linewidth=0.1)
+                ax.grid(color='k', linestyle=':', linewidth=1)
                 ax.tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', length=5, width=1.5)
 
             fig2.tight_layout(rect=[0.03,0.05,1,1])#rect=[0.05,0.05,1,0.05])# [left, bottom, right, top]
@@ -408,7 +411,7 @@ class Rollout(PathConfig):
             fig2.supylabel(r'$\hat{n}$', fontsize=40,fontweight='bold')
             fig.subplots_adjust(wspace=0.2)
 
-            fig2.savefig(os.path.join(self.fig_savepath,'rollouts',f'{model_name}', f'Rollout_{model_name}_DSD.png'), dpi=150)
+            fig2.savefig(os.path.join(self.fig_savepath,'rollouts',f'{model_name}', f'Rollout_{model_name}_DSD.png'), dpi=200)
             plt.show()
 
         # Save stored R2 values per case and feature into a txt file
@@ -425,8 +428,8 @@ class Rollout(PathConfig):
             for feature in r2_feat.keys():
                 print(f'R^2 overall score for feature {feature}: {r2_feat[feature]}', file = file)
 
-    # Plot DSD rollout predictions as histograms along time
-    def plot_rollout_dist(self,rollout_seq, true_data, set_labels, bin_edges, model_name):
+    # Plot DSD rollout predictions as histograms along time: for SMX
+    def plot_rollout_dist_SM(self,rollout_seq, true_data, set_labels, bin_edges, model_name):
 
         cmap = sns.color_palette('RdBu',n_colors=256)
 
@@ -443,7 +446,7 @@ class Rollout(PathConfig):
         for t in range(self.steps_in, true_data.shape[0]):
             
             # temporal distribution
-            fig,ax = plt.subplots(4,2, figsize=(12, 12))
+            fig,ax = plt.subplots(1,3, figsize=(12, 12))
             fig.tight_layout(rect=[0.05,0.02,1,0.9])
             for seq, case in enumerate(set_labels):
                 # # if more than one columns are plotting
@@ -469,8 +472,51 @@ class Rollout(PathConfig):
             fig.supxlabel(r'log$_{10} (V_d/V_{cap})$',fontweight='bold')
             fig.supylabel(f'Drop count density',fontweight='bold')
 
-            fig.savefig(os.path.join(self.fig_savepath, 'temporal_dist',model_name,f'Rollout_{model_name}_DSD_{t}.png'), dpi=150)
+            fig.savefig(os.path.join(self.fig_savepath, 'temporal_dist',model_name,f'Rollout_{model_name}_DSD_{t}.png'), dpi=200)
             #plt.show()
+
+    # Plot DSD rollout predictions as histograms along time: for both mixers in IECR
+    def plot_rollout_dist(self,rollout_seq, true_data, set_labels, bin_edges, model_name):
+
+        cmap = sns.color_palette('RdBu',n_colors=256)
+
+        # Splitting Rd and Bl scales
+        white_idx = int(len(cmap)/2) # midway
+        split_idx = int(len(cmap)*0.1)
+        palette = cmap[:white_idx - split_idx] + cmap[white_idx+split_idx:]
+
+        # Color palette step
+        n_colors = int(len(palette)/len(set_labels))
+        colors = palette[::n_colors]
+
+        # comparison of temporal distributions
+        for t in range(self.steps_in, true_data.shape[0]):
+            
+            # temporal distribution
+            fig,axes = plt.subplots(1,3, figsize=(12, 6))
+            fig.tight_layout(rect=[0.05,0.05,1,0.98]) #[left,bottom,right,top]
+            for seq, case in enumerate(set_labels):
+                
+                # Target plots, true data from CFD
+                plot_label = fine_labels.get(case,case)
+
+                axes[seq].hist(bin_edges, bins=len(bin_edges), weights=true_data[t,seq,2:], color='gray', alpha=0.5, label=f'Target')
+                axes[seq].hist(bin_edges, bins=len(bin_edges), weights=rollout_seq[seq,t,2:],color = colors[seq % len(colors)],
+                            lw=2, fill=None, histtype='step', label=f'Pred')
+                
+                plt.setp(axes[seq].spines.values(),linewidth = 1.5)
+                for axis in ['top', 'bottom', 'left', 'right']:
+                    axes[seq].spines[axis].set_linewidth(1.5)  # change width
+
+                axes[seq].set_title(f'{plot_label}', fontsize=25)
+                axes[seq].legend(loc='upper right',fontsize=16)
+            
+            # fig.suptitle(f'Prediction with {model_name} for Drop Size Distribution at timestep {t_label:.4f}', fontweight='bold')
+            fig.supxlabel(r'log$_{10} (V_d/V_{cap})$',fontweight='bold',fontsize=30)
+            fig.supylabel(f'Drop count density',fontweight='bold',fontsize=30)
+
+            fig.savefig(os.path.join(self.fig_savepath, 'temporal_dist',model_name,f'Rollout_{model_name}_DSD_{t}.png'), dpi=200)
+            # plt.show()
 
     # Wasserstein distance 
     def plot_EMD(self,rollout_seq, true_data, set_labels, bin_edges, model_name):
@@ -507,13 +553,16 @@ class Rollout(PathConfig):
                 emd_data[case].append(emd)
 
                 plt.scatter(range(self.steps_in,t_label+1), emd_data[case],color = colors[seq % len(colors)],label=f'{plot_label}')
-                plt.xlim([50,400])
+                if self.mixer == 'Stirred Mixer':
+                    plt.xlim([50,400])
+                else:
+                    plt.xlim([40,100])
                 plt.ylim([0,1])
-                plt.ylabel('Wasserstein distance',fontweight='bold',fontsize=30)
-                plt.xlabel(r'Time steps',fontweight='bold',fontsize=30)
-                plt.tick_params(axis='both',labelsize=20)
-                plt.legend(title=f'{model_name}: {self.mixer}', title_fontsize=20,
-                                loc='upper right',fontsize=16,
+                plt.ylabel('Wasserstein distance',fontweight='bold',fontsize=40)
+                plt.xlabel(r'Time steps',fontweight='bold',fontsize=40)
+                plt.tick_params(axis='both',labelsize=25)
+                plt.legend(title=f'{model_name}: {self.mixer}', title_fontsize=25,
+                                loc='upper right',fontsize=25,
                                 edgecolor='black', frameon=True)
 
                 for axis in ['top', 'bottom', 'left', 'right']:
@@ -521,7 +570,7 @@ class Rollout(PathConfig):
 
                         
             plt.tight_layout()
-            plt.savefig(os.path.join(self.fig_savepath, 'temporal_EMD',model_name,f'EMD_{model_name}_DSD_{t}.png'), dpi=150)
+            plt.savefig(os.path.join(self.fig_savepath, 'temporal_EMD',model_name,f'EMD_{model_name}_DSD_{t}.png'), dpi=200)
 
     # KL divergence 
     def plot_KL(self,rollout_seq, true_data, set_labels, model_name):
@@ -550,10 +599,7 @@ class Rollout(PathConfig):
                 plot_label = fine_labels.get(case,case)
 
                 ##KL DIV
-                try:
-                    kl = kl_div(np.array(rollout_seq[seq,t,2:]),np.array(true_data[t,seq,2:])).sum()
-                except:
-                    kl=-0.05
+                kl = kl_div(np.array(rollout_seq[seq,t,2:]),np.array(true_data[t,seq,2:])).sum()
                 
                 kl_data[case].append(kl)
 
@@ -571,11 +617,11 @@ class Rollout(PathConfig):
 
                         
             plt.tight_layout()
-            plt.savefig(os.path.join(self.fig_savepath, 'temporal_KL',model_name,f'KL_{model_name}_DSD_{t}.png'), dpi=150)
+            plt.savefig(os.path.join(self.fig_savepath, 'temporal_KL',model_name,f'KL_{model_name}_DSD_{t}.png'), dpi=200)
 
     # y_x error dispersion for training/validation
     def plot_y_x(self,model, model_name,set_labels, features,
-                        X_data,true_data,casebatch_len,type='combined',dpi=150):
+                        X_data,true_data,casebatch_len,type='combined',dpi=200):
 
         model.eval()
 
@@ -793,11 +839,12 @@ class Rollout(PathConfig):
         ## Plot configuration and styling
         plt.xlabel('True Data',fontsize=40,fontdict=dict(weight='bold'))
         plt.ylabel('Predicted Data',fontsize=40,fontdict=dict(weight='bold'))
-
-        legend = plt.legend(ncol=2,title=self.mixer,title_fontsize=20,fontsize=14,
-                        edgecolor='black', frameon=True)
-        for handle in legend.legendHandles:
-            handle.set_markersize(10)
+        
+        if 'FC' in model_name:
+            legend = plt.legend(ncol=2,title=self.mixer,title_fontsize=20,fontsize=14,
+                            edgecolor='black', frameon=True)
+            for handle in legend.legendHandles:
+                handle.set_markersize(10)
         plt.grid(color='k', linestyle=':', linewidth=1)
         plt.tick_params(bottom=True, top=True, left=True, right=True,axis='both',direction='in', length=5, width=1.5)
         plt.xticks(fontsize=30,fontweight='bold')
@@ -1038,8 +1085,11 @@ def main():
 
         if t_evol_choice.lower() == 'y':
             rollout.plot_EMD(rollout_seq,test_arr, splitset_labels[2], bin_edges, model_choice)
-            rollout.plot_KL(rollout_seq,test_arr, splitset_labels[2], model_choice)
-            rollout.plot_rollout_dist(rollout_seq,test_arr, splitset_labels[2], bin_edges, model_choice)
+            # rollout.plot_KL(rollout_seq,test_arr, splitset_labels[2], model_choice)
+            if mixer_choice == 'sm':
+                rollout.plot_rollout_dist(rollout_seq,test_arr, splitset_labels[2][:3], bin_edges, model_choice)
+            else:
+                rollout.plot_rollout_dist(rollout_seq,test_arr, splitset_labels[2], bin_edges, model_choice)
 
 
     #Reporting code performance
